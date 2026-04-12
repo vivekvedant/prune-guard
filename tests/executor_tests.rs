@@ -5,10 +5,11 @@ use std::thread;
 use std::time::Duration;
 
 use prune_guard::{
-    ActionPlan, BackendKind, CandidateArtifact, CleanupActionKind, CleanupError, CleanupExecutor,
+    ActionPlan, BackendKind, CandidateArtifact, CleanupActionKind, CleanupError,
     ExecutionContract, ExecutionMode, ExecutionRequest, ExecutionResponse, PlannedAction,
     ResourceKind, SkippedCandidate,
 };
+use prune_guard::executor::CleanupExecutor;
 
 #[test]
 fn dry_run_plan_never_calls_backend_delete() {

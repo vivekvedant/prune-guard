@@ -38,23 +38,32 @@ impl CleanupPlanner {
     pub fn plan(&self, request: ActionPlanningRequest) -> ActionPlan {
         let ActionPlanningRequest {
             backend,
+            config,
             candidates,
             ..
         } = request;
 
-        let policy = PolicyEngine::new(self.config.clone());
-        let evaluation = policy.evaluate_candidates(candidates);
+        // Safety-critical: each run can override config (for example dry-run/cap).
+        // Planning must use request-scoped config instead of constructor defaults.
+        let policy = PolicyEngine::new(config.clone());
 
         let mut actions = Vec::new();
-        let mut skipped = evaluation.skipped;
+        let mut skipped = Vec::new();
 
-        let max_delete_bytes = self
-            .config
+        let max_delete_bytes = config
             .max_delete_per_run_gb
             .saturating_mul(Self::BYTES_PER_GIB);
         let mut remaining_delete_bytes = max_delete_bytes;
 
-        for candidate in evaluation.accepted {
+        for candidate in candidates {
+            let candidate = match policy.evaluate_candidate(candidate) {
+                Ok(candidate) => candidate,
+                Err(skipped_candidate) => {
+                    skipped.push(skipped_candidate);
+                    continue;
+                }
+            };
+
             if candidate.backend != backend {
                 skipped.push(SkippedCandidate {
                     candidate,
@@ -87,14 +96,14 @@ impl CleanupPlanner {
             actions.push(PlannedAction {
                 candidate,
                 kind: CleanupActionKind::Delete,
-                dry_run: self.config.dry_run,
+                dry_run: config.dry_run,
                 reason: Some("policy_accepted_within_delete_cap".to_string()),
             });
         }
 
         ActionPlan {
             backend,
-            dry_run: self.config.dry_run,
+            dry_run: config.dry_run,
             actions,
             skipped,
         }

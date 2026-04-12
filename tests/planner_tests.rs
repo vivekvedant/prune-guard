@@ -113,6 +113,135 @@ fn planner_carries_policy_rejection_reasons() {
     assert_eq!(plan.skipped[0].reason, "metadata_incomplete");
 }
 
+#[test]
+fn planner_uses_request_config_for_policy_cap_and_dry_run() {
+    let mut planner_cfg = base_config();
+    planner_cfg.min_unused_age_days = 7;
+    planner_cfg.max_delete_per_run_gb = 10;
+    planner_cfg.dry_run = false;
+    let planner = CleanupPlanner::new(planner_cfg);
+
+    let mut request_cfg = base_config();
+    request_cfg.min_unused_age_days = 30;
+    request_cfg.max_delete_per_run_gb = 1;
+    request_cfg.dry_run = true;
+
+    let mut policy_rejected = candidate_template(
+        "img-policy-rejected-by-request-config",
+        BackendKind::Docker,
+        Some(BYTES_PER_GIB),
+    );
+    policy_rejected.age_days = Some(20);
+
+    let request = ActionPlanningRequest {
+        backend: BackendKind::Docker,
+        config: request_cfg,
+        usage: usage_template(),
+        candidates: vec![
+            policy_rejected,
+            candidate_template("img-action", BackendKind::Docker, Some(BYTES_PER_GIB)),
+            candidate_template("img-cap-rejected", BackendKind::Docker, Some(BYTES_PER_GIB)),
+        ],
+    };
+
+    let plan = planner.plan(request);
+
+    let planned_ids: Vec<&str> = plan
+        .actions
+        .iter()
+        .map(|action| action.candidate.identifier.as_str())
+        .collect();
+    let skipped_ids: Vec<&str> = plan
+        .skipped
+        .iter()
+        .map(|entry| entry.candidate.identifier.as_str())
+        .collect();
+    let skipped_reasons: Vec<&str> = plan
+        .skipped
+        .iter()
+        .map(|entry| entry.reason.as_str())
+        .collect();
+
+    assert_eq!(planned_ids, vec!["img-action"]);
+    assert_eq!(
+        skipped_ids,
+        vec!["img-policy-rejected-by-request-config", "img-cap-rejected"]
+    );
+    assert_eq!(
+        skipped_reasons,
+        vec!["candidate_too_new", "deletion_cap_reached"]
+    );
+    assert!(plan.dry_run);
+    assert!(plan.actions.iter().all(|action| action.dry_run));
+}
+
+#[test]
+fn planner_preserves_skipped_order_across_policy_and_planner_rejections() {
+    let mut cfg = base_config();
+    cfg.max_delete_per_run_gb = 1;
+    let planner = CleanupPlanner::new(cfg.clone());
+
+    let mut policy_rejected = candidate_template(
+        "img-policy-second",
+        BackendKind::Docker,
+        Some(BYTES_PER_GIB),
+    );
+    policy_rejected.metadata_complete = false;
+
+    let request = ActionPlanningRequest {
+        backend: BackendKind::Docker,
+        config: cfg,
+        usage: usage_template(),
+        candidates: vec![
+            candidate_template(
+                "img-cap-first",
+                BackendKind::Docker,
+                Some(2 * BYTES_PER_GIB),
+            ),
+            policy_rejected,
+            candidate_template(
+                "img-backend-third",
+                BackendKind::Podman,
+                Some(BYTES_PER_GIB),
+            ),
+            candidate_template("img-size-fourth", BackendKind::Docker, None),
+        ],
+    };
+
+    let plan = planner.plan(request);
+
+    let skipped_ids: Vec<&str> = plan
+        .skipped
+        .iter()
+        .map(|entry| entry.candidate.identifier.as_str())
+        .collect();
+    let skipped_reasons: Vec<&str> = plan
+        .skipped
+        .iter()
+        .map(|entry| entry.reason.as_str())
+        .collect();
+
+    assert!(plan.actions.is_empty());
+    assert_eq!(
+        skipped_ids,
+        vec![
+            "img-cap-first",
+            "img-policy-second",
+            "img-backend-third",
+            "img-size-fourth"
+        ]
+    );
+    assert_eq!(
+        skipped_reasons,
+        vec![
+            "deletion_cap_reached",
+            "metadata_incomplete",
+            "candidate_backend_mismatch",
+            "candidate_size_unknown"
+        ]
+    );
+}
+
 fn base_config() -> CleanupConfig {
     CleanupConfig {
         min_unused_age_days: 14,
