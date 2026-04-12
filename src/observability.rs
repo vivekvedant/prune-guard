@@ -5,6 +5,7 @@ use std::sync::Mutex;
 
 /// Stable schema version for structured log records.
 pub const LOG_SCHEMA_VERSION: &str = "1.0";
+const CORE_LOG_FIELDS: [&str; 6] = ["schema_version", "level", "event_type", "reason", "backend", "action"];
 
 /// Log severity used by structured log records.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -84,6 +85,10 @@ impl StructuredLogRecord {
             map.insert("action".to_string(), action_to_str(action).to_string());
         }
         for (key, value) in &self.details {
+            // Never allow detail payloads to overwrite core envelope fields.
+            if CORE_LOG_FIELDS.contains(&key.as_str()) {
+                continue;
+            }
             map.insert(key.clone(), value.clone());
         }
         map
@@ -111,9 +116,11 @@ pub fn redact_value(key: &str, value: &str) -> String {
         return "[REDACTED]".to_string();
     }
 
-    if let Some(rest) = value.strip_prefix("Bearer ") {
-        if !rest.is_empty() {
-            return "Bearer [REDACTED]".to_string();
+    let trimmed = value.trim_start();
+    if let Some((scheme, credential)) = trimmed.split_once(char::is_whitespace) {
+        let credential = credential.trim_start();
+        if scheme.eq_ignore_ascii_case("bearer") && !credential.is_empty() {
+            return format!("{scheme} [REDACTED]");
         }
     }
 
@@ -364,9 +371,14 @@ fn escape_json(value: &str) -> String {
         match ch {
             '\\' => escaped.push_str("\\\\"),
             '"' => escaped.push_str("\\\""),
+            '\u{0008}' => escaped.push_str("\\b"),
+            '\u{000C}' => escaped.push_str("\\f"),
             '\n' => escaped.push_str("\\n"),
             '\r' => escaped.push_str("\\r"),
             '\t' => escaped.push_str("\\t"),
+            '\u{0000}'..='\u{001F}' => {
+                escaped.push_str(&format!("\\u{:04x}", ch as u32));
+            }
             _ => escaped.push(ch),
         }
     }

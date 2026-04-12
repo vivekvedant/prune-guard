@@ -22,12 +22,34 @@ fn structured_log_record_exposes_required_schema_fields() {
 }
 
 #[test]
+fn structured_log_record_does_not_allow_detail_overrides_of_core_fields() {
+    let record = StructuredLogRecord::new(LogLevel::Warn, "run_summary", "canonical-reason")
+        .with_backend(BackendKind::Docker)
+        .with_detail("reason", "attacker-value")
+        .with_detail("schema_version", "0")
+        .with_detail("candidate_id", "sha256:def");
+
+    let map = record.to_kv_map();
+    assert_eq!(map.get("reason"), Some(&"canonical-reason".to_string()));
+    assert_eq!(map.get("schema_version"), Some(&LOG_SCHEMA_VERSION.to_string()));
+    assert_eq!(map.get("candidate_id"), Some(&"sha256:def".to_string()));
+}
+
+#[test]
 fn redaction_masks_sensitive_fields_and_tokens() {
     assert_eq!(redact_value("token", "abc"), "[REDACTED]");
     assert_eq!(redact_value("password", "abc"), "[REDACTED]");
     assert_eq!(
         redact_value("http_header", "Bearer my-secret"),
         "Bearer [REDACTED]"
+    );
+    assert_eq!(
+        redact_value("http_header", "bearer my-secret"),
+        "bearer [REDACTED]"
+    );
+    assert_eq!(
+        redact_value("http_header", "BeArEr my-secret"),
+        "BeArEr [REDACTED]"
     );
     assert_eq!(redact_value("authorization", "Bearer my-secret"), "[REDACTED]");
     assert_eq!(redact_value("plain_field", "visible"), "visible");
@@ -140,6 +162,21 @@ fn supported_os_validation_returns_reasonable_report() {
     let unknown = validate_supported_os("aix");
     assert!(!unknown.supported);
     assert!(unknown.reason.contains("unsupported"));
+}
+
+#[test]
+fn json_render_escapes_all_control_characters() {
+    let payload = format!("a{}b{}c{}d", '\u{0008}', '\u{000C}', '\u{0000}');
+    let json = StructuredLogRecord::new(LogLevel::Info, "control_chars", "ok")
+        .with_detail("payload", payload)
+        .to_json_line();
+
+    assert!(json.contains("\\b"));
+    assert!(json.contains("\\f"));
+    assert!(json.contains("\\u0000"));
+    assert!(!json.contains('\u{0008}'));
+    assert!(!json.contains('\u{000C}'));
+    assert!(!json.contains('\u{0000}'));
 }
 
 fn sample_usage() -> UsageSnapshot {
