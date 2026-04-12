@@ -26,6 +26,8 @@ pub mod executor;
 pub mod planner;
 /// Fail-closed policy engine for candidate selection.
 pub mod policy;
+/// Phase 8 observability, security, and portability checks.
+pub mod observability;
 /// Scheduler/watermark loop orchestration for periodic daemon ticks.
 pub mod scheduler;
 
@@ -44,6 +46,12 @@ pub use domain::{
 pub use docker_backend::{CommandRunner, DockerBackend, OsCommandRunner};
 pub use error::{CleanupError, Result};
 pub use executor::{ActionExecutionFailure, CleanupExecutor, ExecutionReport};
+pub use observability::{
+    emit_scheduler_metrics, evaluate_least_privilege, parse_supported_os, preflight_execution,
+    redact_value, validate_supported_os, AuditableRunSummary, InMemoryMetricsRecorder, LeastPrivilegeReport,
+    LogLevel, MetricsRecorder, NoopMetricsRecorder, PortabilityReport, RuntimePreflightDecision,
+    StructuredLogRecord, SupportedOs, LOG_SCHEMA_VERSION,
+};
 pub use planner::CleanupPlanner;
 pub use policy::{PolicyEngine, PolicyEvaluation};
 pub use podman_backend::PodmanBackend;
