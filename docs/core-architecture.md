@@ -1,9 +1,9 @@
-# Phase 1 Core Skeleton
+# Core Architecture
 
 ## Purpose
 
-Phase 1 establishes a compile-ready, safety-first Rust foundation for the Cleanup Daemon.
-This phase does not perform real cleanup against Docker/Podman yet. It defines the shared model, configuration contract, backend interfaces, and baseline tests that future phases build on.
+This document establishes a compile-ready, safety-first Rust foundation for the Cleanup Daemon.
+It does not perform real cleanup against Docker/Podman yet. It defines the shared model, configuration contract, backend interfaces, and baseline tests that future work builds on.
 
 ## Scope Delivered
 
@@ -26,7 +26,7 @@ This phase does not perform real cleanup against Docker/Podman yet. It defines t
 
 ## Safety Defaults
 
-Phase 1 intentionally defaults to fail-closed behavior.
+This foundation intentionally defaults to fail-closed behavior.
 
 - `dry_run` defaults to `true`
 - unknown or ambiguous candidate metadata is treated as non-actionable
@@ -72,7 +72,7 @@ Baseline tests verify:
 - invalid threshold relationship rejection
 - fail-closed candidate behavior for incomplete/ambiguous metadata
 
-## Out of Scope in Phase 1
+## Out of Scope
 
 - scheduler watermark loop
 - real backend adapters (Docker/Podman)
@@ -81,5 +81,5 @@ Baseline tests verify:
 
 ## Next Phase Handoff
 
-Phase 2 should implement policy filtering on top of these models/contracts.
+Policy filtering should build on top of these models/contracts.
 The critical rule remains unchanged: when uncertain, skip deletion.

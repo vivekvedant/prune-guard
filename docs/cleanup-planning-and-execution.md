@@ -1,9 +1,8 @@
-# Phase 3 Planner + Executor
+# Cleanup Planning and Execution
 
 ## Purpose
 
-Phase 3 implements the safety-critical bridge between candidate policy filtering
-and backend deletion calls.
+This document implements the safety-critical bridge between candidate policy filtering and backend deletion calls.
 
 This phase introduces:
 
@@ -72,7 +71,7 @@ Execution outputs:
 - per-action error capture with continuation
 - timeout failure capture
 
-## Out of Scope in Phase 3
+## Out of Scope
 
 - scheduler watermark loop and stop conditions
 - real Docker/Podman backend adapter behavior
@@ -80,7 +79,7 @@ Execution outputs:
 
 ## Next Phase Handoff
 
-Phase 4 can consume:
+The scheduler can consume:
 
 - `CleanupPlanner::plan` to generate bounded action plans
 - `CleanupExecutor::execute_plan` to run those plans safely inside the scheduler loop

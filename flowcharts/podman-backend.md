@@ -1,4 +1,4 @@
-# Phase 6 Podman Backend Flowchart
+# Podman Backend Flowchart
 
 This document captures Podman adapter parity flow and graceful degradation behavior.
 

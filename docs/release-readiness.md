@@ -1,4 +1,4 @@
-# Phase 9 Release Readiness
+# Release Readiness
 
 ## Purpose
 
@@ -19,7 +19,7 @@ The goal is to make the release path explicit, repeatable, and fail-closed befor
 
 - The release docs describe the same runtime behavior as the implementation phases.
 - The runbook and checklist are treated as required operating artifacts, not optional notes.
-- Phase docs remain versioned alongside code so reviewers can trace the intended safety model.
+- Feature docs remain versioned alongside code so reviewers can trace the intended safety model.
 - If documentation and implementation disagree, the safest interpretation wins and the release is blocked until the mismatch is resolved.
 
 ### Fail-Closed Release Policy
@@ -79,7 +79,7 @@ The goal is to make the release path explicit, repeatable, and fail-closed befor
 
 - `docs/release-runbook.md`
 - `docs/pr-checklist.md`
-- `docs/phase-9-release-readiness.md`
-- `flowcharts/phase-9-release-readiness.md`
+- `docs/release-readiness.md`
+- `flowcharts/release-readiness.md`
 - updated `docs/README.md`
 - updated `flowcharts/README.md`

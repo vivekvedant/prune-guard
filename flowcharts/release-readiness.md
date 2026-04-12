@@ -1,6 +1,6 @@
-# Phase 9 Release Readiness Flowchart
+# Release Readiness Flowchart
 
-This document captures the documentation alignment and release-readiness path for Phase 9.
+This document captures the documentation alignment and release-readiness path.
 
 ## Docs Alignment Flow
 

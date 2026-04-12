@@ -1,12 +1,10 @@
-# Phase 4 Scheduler + Watermark Loop
+# Scheduler Watermark Loop
 
 ## Purpose
 
-Phase 4 adds a bounded scheduler tick that starts cleanup only when storage usage
-reaches the high watermark and then loops safely until a stop condition is met.
+This document adds a bounded scheduler tick that starts cleanup only when storage usage reaches the high watermark and then loops safely until a stop condition is met.
 
-This phase orchestrates Phase 2 policy filtering and Phase 3 planner/executor
-behavior under explicit fail-closed stop rules.
+This scheduler orchestrates policy filtering and planning/execution behavior under explicit fail-closed stop rules.
 
 ## Scope Delivered
 

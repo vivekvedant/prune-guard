@@ -1,6 +1,6 @@
 # Docs Folder
 
-This folder contains project documentation beyond top-level requirement and process files.
+This folder contains feature-oriented documentation beyond top-level requirement and process files.
 
 ## Contents
 
@@ -8,17 +8,17 @@ This folder contains project documentation beyond top-level requirement and proc
 - Runbooks
 - Decision records
 - Operational procedures
-- Phase 1 implementation notes: project layout, config loading, backend interfaces, baseline tests
-- `phase-1-core-skeleton.md`: Phase 1 architecture, safety defaults, contracts, and test coverage
-- `phase-2-policy-engine.md`: Phase 2 fail-closed policy filtering, reject reasons, and test coverage
-- `phase-3-planner-executor.md`: Phase 3 planning, delete-cap enforcement, and safe execution behavior
-- `phase-4-scheduler-watermark-loop.md`: Phase 4 scheduler contract, watermark stop conditions, and fail-closed behavior
-- `phase-4-pr-test-gate.md`: PR-to-main CI test gate and merge-protection guidance
-- `phase-5-docker-backend.md`: Phase 5 Docker adapter behavior, safety checks, and test coverage
-- `phase-6-podman-backend.md`: Phase 6 Podman adapter parity behavior, graceful degradation, and test coverage
-- `phase-7-reliability-error-handling.md`: Phase 7 retry/backoff, partial-failure continuation, locking, and fail-closed reliability behavior
-- `phase-8-observability-security-portability.md`: Phase 8 structured logs, redaction, metrics hooks, least-privilege checks, and OS validation
-- `phase-9-release-readiness.md`: Phase 9 documentation alignment, release readiness rules, dry-run default, and fail-closed release guidance
+- Core architecture notes: project layout, config loading, backend interfaces, baseline tests
+- `core-architecture.md`: architecture, safety defaults, contracts, and test coverage
+- `policy-engine.md`: fail-closed policy filtering, reject reasons, and test coverage
+- `cleanup-planning-and-execution.md`: planning, delete-cap enforcement, and safe execution behavior
+- `scheduler-watermark-loop.md`: scheduler contract, watermark stop conditions, and fail-closed behavior
+- `ci-pr-main-gate.md`: PR-to-main CI test gate and merge-protection guidance
+- `docker-backend.md`: Docker adapter behavior, safety checks, and test coverage
+- `podman-backend.md`: Podman adapter parity behavior, graceful degradation, and test coverage
+- `reliability-and-error-handling.md`: retry/backoff, partial-failure continuation, locking, and fail-closed reliability behavior
+- `observability-security-portability.md`: structured logs, redaction, metrics hooks, least-privilege checks, and OS validation
+- `release-readiness.md`: documentation alignment, release readiness rules, dry-run default, and fail-closed release guidance
 - `release-runbook.md`: Release operator runbook for merge readiness, documentation checks, and abort conditions
 - `pr-checklist.md`: Reviewer-facing PR checklist for safety-critical release readiness
 

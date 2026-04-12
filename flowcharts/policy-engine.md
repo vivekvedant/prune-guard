@@ -1,7 +1,6 @@
-# Phase 2 Policy Engine Flowcharts
+# Policy Engine Flowcharts
 
-This document captures the Phase 2 candidate policy gate and deterministic
-decision order used by `PolicyEngine`.
+This document captures the candidate policy gate and deterministic decision order used by `PolicyEngine`.
 
 ## 1) Candidate Selection Gate (Fail-Closed)
 

@@ -80,45 +80,71 @@ fn assert_has_fail_closed_and_dry_run_default(path: &Path) {
 }
 
 #[test]
-fn docs_and_flowcharts_readmes_list_phase_nine() {
+fn docs_and_flowcharts_readmes_list_release_readiness_and_are_feature_oriented() {
     let root = repo_root();
     let docs_readme = read_text(&root.join("docs/README.md"));
     let flowcharts_readme = read_text(&root.join("flowcharts/README.md"));
 
     assert!(
-        contains_case_insensitive(&docs_readme, "phase-9"),
-        "docs/README.md must include a Phase 9 entry"
+        contains_case_insensitive(&docs_readme, "release-readiness.md"),
+        "docs/README.md must include the release-readiness entry"
     );
     assert!(
-        contains_case_insensitive(&flowcharts_readme, "phase-9"),
-        "flowcharts/README.md must include a Phase 9 entry"
+        contains_case_insensitive(&flowcharts_readme, "release-readiness.md"),
+        "flowcharts/README.md must include the release-readiness entry"
+    );
+    assert!(
+        !contains_case_insensitive(&docs_readme, "phase-"),
+        "docs/README.md should avoid phase-based file naming"
+    );
+    assert!(
+        !contains_case_insensitive(&flowcharts_readme, "phase-"),
+        "flowcharts/README.md should avoid phase-based file naming"
     );
 }
 
 #[test]
-fn phase_nine_release_readiness_docs_exist_and_include_safety_language() {
+fn release_readiness_docs_exist_and_include_safety_language() {
     let root = repo_root();
-    let docs_phase_nine = markdown_files_matching(&root, "docs", "phase-9");
-    let flowcharts_phase_nine = markdown_files_matching(&root, "flowcharts", "phase-9");
+    let docs_release = root.join("docs/release-readiness.md");
+    let flowcharts_release = root.join("flowcharts/release-readiness.md");
 
     assert!(
-        !docs_phase_nine.is_empty(),
-        "expected at least one Phase 9 markdown doc in docs/"
+        docs_release.exists(),
+        "expected docs/release-readiness.md to exist"
     );
     assert!(
-        !flowcharts_phase_nine.is_empty(),
-        "expected at least one Phase 9 markdown doc in flowcharts/"
+        flowcharts_release.exists(),
+        "expected flowcharts/release-readiness.md to exist"
     );
 
-    for path in docs_phase_nine.iter().chain(flowcharts_phase_nine.iter()) {
-        let content = read_text(path);
+    for path in [docs_release, flowcharts_release] {
+        let content = read_text(&path);
         assert!(
             contains_case_insensitive(&content, "release"),
             "{} should describe release-readiness behavior",
             path.display()
         );
-        assert_has_fail_closed_and_dry_run_default(path);
+        assert_has_fail_closed_and_dry_run_default(&path);
     }
+}
+
+#[test]
+fn docs_and_flowcharts_no_longer_use_phase_filename_pattern() {
+    let root = repo_root();
+    let docs_phase_named = markdown_files_matching(&root, "docs", "phase-");
+    let flowcharts_phase_named = markdown_files_matching(&root, "flowcharts", "phase-");
+
+    assert!(
+        docs_phase_named.is_empty(),
+        "docs/ should not contain phase-based filenames; found: {:?}",
+        docs_phase_named
+    );
+    assert!(
+        flowcharts_phase_named.is_empty(),
+        "flowcharts/ should not contain phase-based filenames; found: {:?}",
+        flowcharts_phase_named
+    );
 }
 
 #[test]

@@ -1,4 +1,4 @@
-# Phase 7 Reliability and Error Handling Flowchart
+# Reliability and Error Handling Flowchart
 
 This document captures retry, continuation, locking, and fail-closed reliability behavior.
 
@@ -49,4 +49,3 @@ Notes:
 - Lock contention and all-backend failure both end in safe no-op outcomes.
 - Retry exhaustion never bypasses safety checks or converts failure into success.
 - Fail-closed mode blocks destructive actions until explicit recovery conditions pass.
-

@@ -1,6 +1,6 @@
-# Phase 1 Core Skeleton Flowcharts
+# Core Architecture Flowcharts
 
-This document captures Phase 1 architecture-level flow. It represents contracts and safety decisions only; runtime cleanup integration is implemented in later phases.
+This document captures the architecture-level flow. It represents contracts and safety decisions only; runtime cleanup integration is implemented later.
 
 ## 1) Data and Control Skeleton
 

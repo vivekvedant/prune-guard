@@ -1,4 +1,4 @@
-# Phase 7 Reliability and Error Handling
+# Reliability and Error Handling
 
 ## Purpose
 
@@ -50,7 +50,7 @@ Define reliability controls that preserve fail-closed cleanup behavior under bac
 
 ## Testing Coverage
 
-Phase 7 test coverage should validate:
+Test coverage should validate:
 
 - retry policy correctness (attempt count, backoff growth, and stop at retry budget)
 - continuation semantics when one backend fails and others succeed
@@ -58,4 +58,3 @@ Phase 7 test coverage should validate:
 - single-instance lock behavior (second instance skips safely)
 - repeated-failure threshold transitions into fail-closed mode
 - recovery path that exits fail-closed mode only after successful checks
-
