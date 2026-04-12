@@ -189,6 +189,8 @@ feat(scope): short description
 * [ ] Tests added and passing
 * [ ] Dry-run tested (if deletion logic)
 * [ ] No unintended deletions possible
+* [ ] Detailed code comments added for non-obvious and safety-critical logic
+* [ ] All scoped code changes are committed (no uncommitted implementation files)
 * [ ] Documentation updated (if behavior changed)
 * [ ] Flowcharts updated (if workflow/policy changed)
 * [ ] Code reviewed
@@ -203,6 +205,7 @@ A PR can ONLY be merged if:
 * Reviewer → APPROVED
 * Tester → PASS
 * No merge conflicts
+* No uncommitted scoped implementation changes remain
 * CI checks pass (if configured)
 * Safety validation completed (for cleanup logic)
 
@@ -217,6 +220,7 @@ A PR can ONLY be merged if:
 * ❌ Unsafe deletion logic without tests
 * ❌ Using destructive commands without dry-run validation
 * ❌ Shipping behavior changes without docs/flowchart updates
+* ❌ Handing off implementation work without committing scoped code changes
 
 ---
 
@@ -235,6 +239,29 @@ The repository MUST maintain dedicated folders:
 
 ---
 
+# 💬 Code Commenting Standards (MANDATORY)
+
+All implementation code MUST include detailed and maintainable comments so new contributors can understand intent without reverse-engineering behavior.
+
+## Commenting Rules
+
+* Every module MUST include a short module-level comment describing purpose and safety role
+* Every public struct/enum MUST include field or variant comments where intent is not obvious
+* Every safety-critical decision path MUST include "why" comments (not only "what")
+* Non-obvious algorithms, parsing logic, and edge-case handling MUST be documented inline
+* Comments MUST describe assumptions and fail-closed behavior when applicable
+* Comments MUST be updated whenever code behavior changes
+* Stale or misleading comments are treated as defects
+
+## Comment Quality Requirements
+
+* Comments should be specific, concrete, and implementation-aligned
+* Generic comments like "set variable" or "do cleanup" are NOT acceptable
+* Safety logic comments MUST clearly state deletion guards and skip conditions
+* Public APIs should be understandable by engineers unfamiliar with Rust internals
+
+---
+
 # ⚡ Agent Responsibilities
 
 ## 🧑‍💻 Coder Agent
@@ -245,7 +272,9 @@ The repository MUST maintain dedicated folders:
 
   * Safe cleanup logic
   * Fail-closed behavior
+* MUST add detailed comments for all non-obvious code and safety-critical paths
 * MUST commit after each stable iteration
+* MUST NOT hand off code changes without a commit containing the scoped implementation
 * MUST validate dry-run before real execution logic
 
 ---
@@ -264,6 +293,8 @@ The repository MUST maintain dedicated folders:
     * in use
     * protected
     * recently used
+* MUST block PR if comments are missing, stale, or insufficient for understanding safety logic
+* MUST block PR if scoped code changes are not committed
 
 ---
 
@@ -298,6 +329,7 @@ The repository MUST maintain dedicated folders:
   * Safety-first development
   * Small iterative delivery
   * Docs and flowchart updates before completion
+  * Commit-complete delivery: scoped implementation changes must be committed before final handoff or PR
 
 ---
 

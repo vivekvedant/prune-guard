@@ -8,8 +8,11 @@ This folder stores standalone flowchart documents for runtime, safety, and workf
 - Safety decision trees
 - Agent orchestration workflows
 - PR and release process diagrams
+- Phase 1 alignment notes: project layout, config loading, backend interfaces, baseline tests
+- `phase-1-core-skeleton.md`: standalone Phase 1 architecture and fail-closed Mermaid flowcharts
 
 ## Rules
 
 - Keep diagrams synchronized with AGENTS.md and requirement.md.
 - Any behavior change MUST update the related flowchart.
+- Safety diagrams should reflect fail-closed behavior and dry-run as the default path.
