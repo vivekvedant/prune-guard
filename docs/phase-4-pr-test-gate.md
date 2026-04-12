@@ -8,6 +8,7 @@ targeting `main`.
 ## Workflow Added
 
 - `.github/workflows/pr-main-tests.yml`
+- `.circleci/config.yml`
 
 Trigger behavior:
 
@@ -21,11 +22,23 @@ Execution behavior:
 - Uses cargo cache for faster repeat runs
 - Runs `cargo test --all-targets --all-features --locked`
 
+CircleCI behavior:
+
+- Uses `cimg/rust:1.94` instead of the floating `cimg/rust:stable` alias.
+- Avoids `manifest unknown` pull failures caused by missing alias tags.
+- Keeps runtime predictable by pinning to a concrete Rust image line.
+
 ## Safety Rationale
 
 - Safety-critical deletion logic must not merge without full test validation.
 - Running all targets and features prevents partial validation blind spots.
 - `--locked` prevents accidental dependency drift in CI.
+- A versioned container image fails closed more safely than a floating alias because pull behavior is explicit and reproducible.
+
+## Regression Test Coverage
+
+- `tests/circleci_config_tests.rs` enforces that CircleCI uses a versioned `cimg/rust` tag.
+- The test fails if `:stable` is reintroduced, preventing recurrence of alias-related pull outages.
 
 ## Merge Gate Requirement
 
