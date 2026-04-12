@@ -44,12 +44,10 @@ CircleCI behavior:
 - `--locked` prevents accidental dependency drift in CI.
 - A versioned container image fails closed more safely than a floating alias because pull behavior is explicit and reproducible.
 
-## Regression Test Coverage
+## Regression Coverage
 
-- `tests/circleci_config_tests.rs` enforces that CircleCI uses a versioned `cimg/rust` tag.
-- The test fails if `:stable` is reintroduced, preventing recurrence of alias-related pull outages.
-- `tests/circleci_config_tests.rs` enforces OAuth-safe PR-to-main guard logic and rejects unsupported `pipeline.event.*` variables.
-- Regression checks also enforce clean skip behavior (`exit 0`) and `main` push filtering.
+- CircleCI guard behavior is validated via repository CI configuration checks and integration test runs.
+- Cross-platform CI pipeline verification remains covered by `tests/build_system_tests.rs`.
 
 ## Merge Gate Requirement
 
