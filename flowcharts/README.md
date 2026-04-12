@@ -1,4 +1,4 @@
-# Flowcharts Folder
+# Flowcharts
 
 This folder stores standalone flowchart documents for runtime, safety, and workflow visualization.
 
@@ -8,19 +8,20 @@ This folder stores standalone flowchart documents for runtime, safety, and workf
 - Safety decision trees
 - Agent orchestration workflows
 - PR and release process diagrams
-- Phase 1 alignment notes: project layout, config loading, backend interfaces, baseline tests
-- `phase-1-core-skeleton.md`: standalone Phase 1 architecture and fail-closed Mermaid flowcharts
-- `phase-2-policy-engine.md`: standalone Phase 2 candidate filtering and determinism flowcharts
-- `phase-3-planner-executor.md`: standalone Phase 3 planning/execution safety flowcharts
-- `phase-4-scheduler-watermark-loop.md`: standalone Phase 4 scheduler watermark loop and fail-closed exit flowcharts
-- `phase-4-pr-test-gate.md`: standalone PR-to-main CI gate and merge rule flowchart
-- `phase-5-docker-backend.md`: standalone Phase 5 Docker backend discovery/execution safety flowcharts
-- `phase-6-podman-backend.md`: standalone Phase 6 Podman backend parity and graceful-degradation flowcharts
-- `phase-7-reliability-error-handling.md`: standalone Phase 7 retry/backoff, lock, and fail-closed reliability flowcharts
-- `phase-8-observability-security-portability.md`: standalone Phase 8 structured logging, preflight security, and portability flowcharts
+- `core-architecture.md`: architecture contracts, config loading, backend interfaces, and fail-closed baseline flowcharts
+- `policy-engine.md`: candidate filtering and deterministic policy flowcharts
+- `cleanup-planning-and-execution.md`: planning, execution, and dry-run safety flowcharts
+- `scheduler-watermark-loop.md`: scheduler watermark loop and fail-closed exit flowcharts
+- `ci-pr-main-gate.md`: PR-to-main CI gate and merge rule flowchart
+- `docker-backend.md`: Docker backend discovery and execution safety flowcharts
+- `podman-backend.md`: Podman backend parity and graceful-degradation flowcharts
+- `reliability-and-error-handling.md`: retry/backoff, lock, and fail-closed reliability flowcharts
+- `observability-security-portability.md`: structured logging, preflight security, and portability flowcharts
+- `release-readiness.md`: documentation alignment, release runbook, and PR checklist flowcharts
 
 ## Rules
 
 - Keep diagrams synchronized with AGENTS.md and requirement.md.
 - Any behavior change MUST update the related flowchart.
 - Safety diagrams should reflect fail-closed behavior and dry-run as the default path.
+- Release-readiness diagrams should show the review gate, documentation alignment, and abort path explicitly.

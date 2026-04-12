@@ -1,7 +1,6 @@
-# Phase 4 Scheduler + Watermark Loop Flowcharts
+# Scheduler + Watermark Loop Flowcharts
 
-This document captures Phase 4 scheduler start/stop behavior and fail-closed
-exit paths.
+This document captures scheduler start/stop behavior and fail-closed exit paths.
 
 ## 1) Watermark Loop Start and Stop
 

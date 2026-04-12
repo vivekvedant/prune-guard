@@ -1,6 +1,6 @@
-# Phase 3 Planner + Executor Flowcharts
+# Cleanup Planning and Execution Flowcharts
 
-This document captures Phase 3 planning and execution safety behavior.
+This document captures planning and execution safety behavior.
 
 ## 1) Planning Gate (Fail-Closed + Delete Cap)
 

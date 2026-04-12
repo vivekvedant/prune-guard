@@ -1,9 +1,8 @@
-# Phase 2 Policy Engine (Fail-Closed Selection)
+# Policy Engine
 
 ## Purpose
 
-Phase 2 implements deterministic, fail-closed candidate filtering on top of the
-Phase 1 domain contracts.
+This document implements deterministic, fail-closed candidate filtering on top of the core architecture domain contracts.
 
 The policy engine is responsible for deciding whether each discovered candidate
 is safe to move forward into planning. If any required safety signal is missing
@@ -48,7 +47,7 @@ or unsafe, the candidate is skipped.
 - one explicit accept path
 - deterministic ordering for batch evaluation results
 
-## Out of Scope in Phase 2
+## Out of Scope
 
 - action planning and deletion cap enforcement
 - dry-run/real-run execution behavior
@@ -56,5 +55,5 @@ or unsafe, the candidate is skipped.
 
 ## Next Phase Handoff
 
-Phase 3 can consume `PolicyEvaluation.accepted` for planning and
+Cleanup planning can consume `PolicyEvaluation.accepted` for planning and
 `PolicyEvaluation.skipped` for audit/report output.

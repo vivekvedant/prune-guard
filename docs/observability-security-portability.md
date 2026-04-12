@@ -1,4 +1,4 @@
-# Phase 8 Observability, Security, and Portability
+# Observability, Security, and Portability
 
 ## Purpose
 

@@ -1,9 +1,8 @@
-# Phase 4 PR Test Gate
+# CI PR-to-Main Gate
 
 ## Purpose
 
-Add a CI gate that runs the complete Rust test suite for every pull request
-targeting `main`.
+Add a CI gate that runs the complete Rust test suite for every pull request targeting `main`.
 
 ## Workflow Added
 

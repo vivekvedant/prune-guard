@@ -1,6 +1,6 @@
-# Phase 8 Observability, Security, and Portability Flowchart
+# Observability, Security, and Portability Flowchart
 
-This document captures Phase 8 runtime observability and fail-closed preflight behavior.
+This document captures runtime observability and fail-closed preflight behavior.
 
 ## Structured Logging and Redaction Flow
 

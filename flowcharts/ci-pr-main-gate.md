@@ -1,4 +1,4 @@
-# Phase 4 PR Test Gate Flowchart
+# CI PR Main Gate Flowchart
 
 This diagram captures CI gating for pull requests targeting `main`.
 
