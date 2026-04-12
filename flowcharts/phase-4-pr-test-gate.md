@@ -26,16 +26,22 @@ Notes:
 
 ```mermaid
 flowchart TD
-    A[CircleCI test job starts] --> B[Pull cimg/rust:1.94]
-    B --> C{Image manifest available?}
-    C -- No --> D[Fail job early and stop execution]
-    C -- Yes --> E[Run cargo test --all-targets --all-features --locked]
-    E --> F{Tests passed?}
-    F -- No --> G[Fail gate]
-    F -- Yes --> H[Pass gate]
+    A[CircleCI job starts] --> B{CIRCLE_PULL_REQUEST set?}
+    B -- No --> C[Halt step fail-closed]
+    B -- Yes --> D[Fetch PR metadata from GitHub API]
+    D --> E{PR base.ref == main?}
+    E -- No --> C
+    E -- Yes --> F[Pull cimg/rust:1.94]
+    F --> G{Image manifest available?}
+    G -- No --> H[Fail job early and stop execution]
+    G -- Yes --> I[Run cargo test --all-targets --all-features --locked]
+    I --> J{Tests passed?}
+    J -- No --> K[Fail gate]
+    J -- Yes --> L[Pass gate]
 ```
 
 Notes:
 
 - Pinning the image tag avoids non-deterministic alias resolution failures.
 - If image pull cannot be resolved, the pipeline stops without running partial validation.
+- OAuth-safe guard logic scopes execution to pull requests targeting `main`.
