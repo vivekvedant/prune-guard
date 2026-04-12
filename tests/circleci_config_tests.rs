@@ -31,12 +31,28 @@ fn circleci_workflow_triggers_only_for_pull_requests_to_main() {
         "workflow must guard for pull request context in an OAuth-safe way"
     );
     assert!(
+        config.contains("CIRCLE_PULL_REQUESTS"),
+        "workflow should support OAuth variants that expose CIRCLE_PULL_REQUESTS"
+    );
+    assert!(
         config.contains("/pulls/${pr_number}"),
         "workflow must query PR metadata to resolve the base branch"
     );
     assert!(
+        config.contains("if ! payload=\"$(curl -fsSL"),
+        "workflow must fail the job when PR metadata cannot be fetched"
+    );
+    assert!(
         config.contains("if [ \"${base_ref}\" != \"main\" ]"),
         "workflow must halt when PR target branch is not main"
+    );
+    assert!(
+        config.contains("circleci-agent step halt\n              exit 0"),
+        "non-targeted pipelines should halt cleanly without failing the job"
+    );
+    assert!(
+        config.contains("ignore: main"),
+        "workflow should ignore direct main-branch pushes for PR-only execution policy"
     );
     assert!(
         !config.contains("pipeline.event.name"),
