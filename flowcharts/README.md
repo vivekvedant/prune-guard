@@ -12,6 +12,7 @@ This folder stores standalone flowchart documents for runtime, safety, and workf
 - `phase-1-core-skeleton.md`: standalone Phase 1 architecture and fail-closed Mermaid flowcharts
 - `phase-2-policy-engine.md`: standalone Phase 2 candidate filtering and determinism flowcharts
 - `phase-3-planner-executor.md`: standalone Phase 3 planning/execution safety flowcharts
+- `phase-4-scheduler-watermark-loop.md`: standalone Phase 4 scheduler watermark loop and fail-closed exit flowcharts
 - `phase-4-pr-test-gate.md`: standalone PR-to-main CI gate and merge rule flowchart
 
 ## Rules

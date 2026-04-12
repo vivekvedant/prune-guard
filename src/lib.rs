@@ -22,6 +22,8 @@ pub mod executor;
 pub mod planner;
 /// Fail-closed policy engine for candidate selection.
 pub mod policy;
+/// Scheduler/watermark loop orchestration for periodic daemon ticks.
+pub mod scheduler;
 
 pub use backend::{
     ActionPlanner, ActionPlannerContract, CandidateDiscoverer, CandidateDiscovererContract,
@@ -39,3 +41,4 @@ pub use error::{CleanupError, Result};
 pub use executor::{ActionExecutionFailure, CleanupExecutor, ExecutionReport};
 pub use planner::CleanupPlanner;
 pub use policy::{PolicyEngine, PolicyEvaluation};
+pub use scheduler::{CleanupScheduler, SchedulerRunReport, SchedulerStopReason};

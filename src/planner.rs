@@ -4,6 +4,9 @@ use crate::domain::{
 };
 use crate::policy::PolicyEngine;
 
+/// Canonical skip reason emitted when per-run delete cap blocks a candidate.
+pub const SKIPPED_REASON_DELETION_CAP_REACHED: &str = "deletion_cap_reached";
+
 /// Planner for Phase 3 candidate-to-action conversion.
 ///
 /// Safety role:
@@ -87,7 +90,7 @@ impl CleanupPlanner {
             if size_bytes > remaining_delete_bytes {
                 skipped.push(SkippedCandidate {
                     candidate,
-                    reason: "deletion_cap_reached".to_string(),
+                    reason: SKIPPED_REASON_DELETION_CAP_REACHED.to_string(),
                 });
                 continue;
             }
