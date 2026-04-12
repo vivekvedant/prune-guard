@@ -11,6 +11,7 @@ This folder stores standalone flowchart documents for runtime, safety, and workf
 - Phase 1 alignment notes: project layout, config loading, backend interfaces, baseline tests
 - `phase-1-core-skeleton.md`: standalone Phase 1 architecture and fail-closed Mermaid flowcharts
 - `phase-2-policy-engine.md`: standalone Phase 2 candidate filtering and determinism flowcharts
+- `phase-3-planner-executor.md`: standalone Phase 3 planning/execution safety flowcharts
 
 ## Rules
 
