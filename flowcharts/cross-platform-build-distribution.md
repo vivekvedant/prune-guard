@@ -1,12 +1,12 @@
 # Cross-Platform Build and Distribution Flowchart
 
-This flowchart captures the build matrix, artifact packaging, checksum generation, smoke tests, and fail-closed release gate for Linux, macOS, and Windows.
+This flowchart captures the CircleCI build matrix, artifact packaging, checksum generation, smoke tests, and fail-closed release gate for Linux, macOS, and Windows.
 
 ## Build Matrix Flow
 
 ```mermaid
 flowchart TD
-    A[Start release build request] --> B[Select Linux, macOS, and Windows targets]
+    A[Start CircleCI release workflow] --> B[Select Linux, macOS, and Windows targets]
     B --> C[Run per-platform build jobs]
     C --> D{Did every target build succeed?}
     D -- No --> E[Stop and fail closed]

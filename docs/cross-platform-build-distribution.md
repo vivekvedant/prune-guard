@@ -4,13 +4,14 @@
 
 Define a repeatable build and release path for Linux, macOS, and Windows so the daemon can be distributed with the same safety model on every supported platform.
 
-This feature makes the build matrix, packaging rules, artifact integrity checks, and release gate explicit before any binary is published.
+This feature makes the CircleCI build matrix, packaging rules, artifact integrity checks, and release gate explicit before any binary is published.
 
 ## Cross-Platform Build Matrix
 
 - Linux builds produce the primary server binary and any release-side helpers required for packaging.
 - macOS builds verify the daemon compiles and packages cleanly on Apple hosts.
 - Windows builds verify the daemon compiles and packages cleanly on Windows hosts.
+- The `.circleci/config.yml` workflow `cross-platform-build-distribution` defines these targets as required jobs.
 - Each target in the matrix must be treated as required unless the release scope explicitly narrows the supported platforms.
 - The matrix is complete only when every declared OS target has a successful build result and a recorded smoke test result.
 
@@ -21,6 +22,7 @@ This feature makes the build matrix, packaging rules, artifact integrity checks,
 - Windows artifacts should be packaged in a platform-appropriate archive format.
 - Packaging must keep the release payload minimal and deterministic.
 - Artifact upload must happen only after the packaged bytes and checksum manifest are ready.
+- CircleCI stores packaged artifacts per platform job so each target’s output is auditable independently.
 - Any missing artifact is treated as an incomplete release, not a partial success.
 
 ## Checksums and Integrity

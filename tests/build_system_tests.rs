@@ -61,49 +61,63 @@ fn assert_has_build_system_language(path: &Path) {
 }
 
 #[test]
-fn build_workflow_exists_and_has_cross_platform_matrix() {
+fn circleci_cross_platform_workflow_exists_and_has_required_jobs() {
     let root = repo_root();
-    let workflow = read_text(&root.join(".github/workflows/build-cross-platform.yml"));
+    let config = read_text(&root.join(".circleci/config.yml"));
 
     assert!(
-        contains_case_insensitive(&workflow, "ubuntu-latest"),
-        "workflow must include linux runner"
+        contains_case_insensitive(&config, "cross-platform-build-distribution"),
+        "CircleCI config must define cross-platform workflow"
     );
     assert!(
-        contains_case_insensitive(&workflow, "macos-latest"),
-        "workflow must include macOS runner"
+        contains_case_insensitive(&config, "linux-build-package"),
+        "CircleCI config must define linux build/package job"
     );
     assert!(
-        contains_case_insensitive(&workflow, "windows-latest"),
-        "workflow must include windows runner"
+        contains_case_insensitive(&config, "macos-build-package"),
+        "CircleCI config must define macOS build/package job"
     );
     assert!(
-        contains_case_insensitive(&workflow, "cargo test --locked"),
-        "workflow must run locked tests on each target"
+        contains_case_insensitive(&config, "windows-build-package"),
+        "CircleCI config must define windows build/package job"
     );
     assert!(
-        contains_case_insensitive(&workflow, "cargo build --release --locked"),
-        "workflow must run locked release builds on each target"
+        contains_case_insensitive(&config, "cargo test --locked"),
+        "CircleCI cross-platform jobs must run locked tests"
     );
     assert!(
-        contains_case_insensitive(&workflow, "smoke test release outputs"),
-        "workflow must include release smoke tests"
+        contains_case_insensitive(&config, "cargo build --release --locked"),
+        "CircleCI cross-platform jobs must run locked release builds"
     );
     assert!(
-        contains_case_insensitive(&workflow, "actions/upload-artifact@v4"),
-        "workflow must upload build artifacts"
+        contains_case_insensitive(&config, "Smoke test release outputs"),
+        "CircleCI cross-platform jobs must include release smoke tests"
     );
     assert!(
-        contains_case_insensitive(&workflow, "if-no-files-found: error"),
-        "artifact upload should fail closed when files are missing"
+        contains_case_insensitive(&config, "store_artifacts"),
+        "CircleCI cross-platform jobs must store packaged artifacts"
     );
     assert!(
-        contains_case_insensitive(&workflow, "scripts/release/package-artifacts.sh"),
-        "workflow must package artifacts on unix targets"
+        contains_case_insensitive(&config, "scripts/release/package-artifacts.sh"),
+        "CircleCI workflow must package artifacts on unix targets"
     );
     assert!(
-        contains_case_insensitive(&workflow, "scripts/release/package-artifacts.ps1"),
-        "workflow must package artifacts on windows targets"
+        contains_case_insensitive(&config, "scripts\\release\\package-artifacts.ps1"),
+        "CircleCI workflow must package artifacts on windows targets"
+    );
+    assert!(
+        contains_case_insensitive(&config, "ignore: main"),
+        "cross-platform workflow should avoid direct main-branch push pipelines"
+    );
+}
+
+#[test]
+fn github_actions_cross_platform_workflow_is_not_used() {
+    let root = repo_root();
+    let github_workflow = root.join(".github/workflows/build-cross-platform.yml");
+    assert!(
+        !github_workflow.exists(),
+        "GitHub workflow should not exist when CircleCI is the source of truth"
     );
 }
 

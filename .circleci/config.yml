@@ -1,6 +1,9 @@
 # .circleci/config.yml
 version: 2.1
 
+orbs:
+  win: circleci/windows@5.0
+
 jobs:
   test:
     docker:
@@ -70,11 +73,333 @@ jobs:
             - target
           key: cargo-{{ checksum "Cargo.lock" }}
 
+  linux-build-package:
+    docker:
+      - image: cimg/rust:1.94
+    steps:
+      - checkout
+      - run:
+          name: Enforce PR-to-main guard
+          command: |
+            pr_url="${CIRCLE_PULL_REQUEST:-}"
+            if [ -z "${pr_url}" ] && [ -n "${CIRCLE_PULL_REQUESTS:-}" ]; then
+              pr_url="$(printf '%s' "${CIRCLE_PULL_REQUESTS}" | cut -d',' -f1)"
+            fi
+
+            if [ -z "${pr_url}" ]; then
+              echo "No pull request context found; halting."
+              circleci-agent step halt
+              exit 0
+            fi
+
+            pr_number="${pr_url##*/}"
+            api_url="https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/pulls/${pr_number}"
+
+            auth_header=()
+            if [ -n "${GITHUB_TOKEN:-}" ]; then
+              auth_header=(-H "Authorization: Bearer ${GITHUB_TOKEN}")
+            fi
+
+            if ! payload="$(curl -fsSL "${auth_header[@]}" -H "Accept: application/vnd.github+json" "${api_url}" | tr -d '\n')"; then
+              echo "Failed to fetch PR metadata for ${pr_url}; refusing to proceed."
+              exit 1
+            fi
+
+            base_ref="$(printf '%s' "${payload}" | sed -n 's/.*"base":[[:space:]]*{[^}]*"ref":[[:space:]]*"\([^"]*\)".*/\1/p')"
+
+            if [ -z "${base_ref}" ]; then
+              echo "Could not resolve PR base branch; refusing to proceed."
+              exit 1
+            fi
+
+            if [ "${base_ref}" != "main" ]; then
+              echo "PR targets '${base_ref}', not 'main'; halting."
+              circleci-agent step halt
+              exit 0
+            fi
+
+      - run:
+          name: Run tests
+          command: cargo test --locked
+
+      - run:
+          name: Build release
+          command: cargo build --release --locked
+
+      - run:
+          name: Smoke test release outputs
+          command: |
+            set -euo pipefail
+            release_dir="target/release"
+            if [ ! -d "$release_dir" ]; then
+              echo "Release directory missing: $release_dir"
+              exit 1
+            fi
+
+            first_release_file="$(find "$release_dir" -type f -size +0c -print -quit)"
+            if [ -z "$first_release_file" ]; then
+              echo "Release directory does not contain any non-empty files."
+              exit 1
+            fi
+
+      - run:
+          name: Package artifacts
+          command: |
+            bash scripts/release/package-artifacts.sh \
+              --workspace-root "$PWD" \
+              --output-dir dist
+
+      - run:
+          name: Verify packaged artifacts
+          command: |
+            set -euo pipefail
+            archive_path="$(find dist -type f -name "*.tar.gz" -print -quit)"
+            if [ -z "$archive_path" ] || [ ! -s "$archive_path" ]; then
+              echo "Packaged archive is missing or empty."
+              exit 1
+            fi
+
+            checksum_path="${archive_path}.sha256"
+            if [ ! -s "$checksum_path" ]; then
+              echo "Checksum file is missing or empty."
+              exit 1
+            fi
+
+            tar -tzf "$archive_path" >/dev/null
+
+      - store_artifacts:
+          path: dist
+          destination: prune-guard-linux
+
+  macos-build-package:
+    macos:
+      xcode: "15.4.0"
+    steps:
+      - checkout
+      - run:
+          name: Enforce PR-to-main guard
+          command: |
+            pr_url="${CIRCLE_PULL_REQUEST:-}"
+            if [ -z "${pr_url}" ] && [ -n "${CIRCLE_PULL_REQUESTS:-}" ]; then
+              pr_url="$(printf '%s' "${CIRCLE_PULL_REQUESTS}" | cut -d',' -f1)"
+            fi
+
+            if [ -z "${pr_url}" ]; then
+              echo "No pull request context found; halting."
+              circleci-agent step halt
+              exit 0
+            fi
+
+            pr_number="${pr_url##*/}"
+            api_url="https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/pulls/${pr_number}"
+
+            auth_header=()
+            if [ -n "${GITHUB_TOKEN:-}" ]; then
+              auth_header=(-H "Authorization: Bearer ${GITHUB_TOKEN}")
+            fi
+
+            if ! payload="$(curl -fsSL "${auth_header[@]}" -H "Accept: application/vnd.github+json" "${api_url}" | tr -d '\n')"; then
+              echo "Failed to fetch PR metadata for ${pr_url}; refusing to proceed."
+              exit 1
+            fi
+
+            base_ref="$(printf '%s' "${payload}" | sed -n 's/.*"base":[[:space:]]*{[^}]*"ref":[[:space:]]*"\([^"]*\)".*/\1/p')"
+            if [ -z "${base_ref}" ]; then
+              echo "Could not resolve PR base branch; refusing to proceed."
+              exit 1
+            fi
+
+            if [ "${base_ref}" != "main" ]; then
+              echo "PR targets '${base_ref}', not 'main'; halting."
+              circleci-agent step halt
+              exit 0
+            fi
+
+      - run:
+          name: Install Rust if missing
+          command: |
+            if ! command -v cargo >/dev/null 2>&1; then
+              curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal
+            fi
+            echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> "$BASH_ENV"
+
+      - run:
+          name: Run tests
+          command: |
+            source "$BASH_ENV"
+            cargo test --locked
+
+      - run:
+          name: Build release
+          command: |
+            source "$BASH_ENV"
+            cargo build --release --locked
+
+      - run:
+          name: Smoke test release outputs
+          command: |
+            set -euo pipefail
+            release_dir="target/release"
+            if [ ! -d "$release_dir" ]; then
+              echo "Release directory missing: $release_dir"
+              exit 1
+            fi
+
+            first_release_file="$(find "$release_dir" -type f -size +0c -print -quit)"
+            if [ -z "$first_release_file" ]; then
+              echo "Release directory does not contain any non-empty files."
+              exit 1
+            fi
+
+      - run:
+          name: Package artifacts
+          command: |
+            source "$BASH_ENV"
+            bash scripts/release/package-artifacts.sh \
+              --workspace-root "$PWD" \
+              --output-dir dist
+
+      - run:
+          name: Verify packaged artifacts
+          command: |
+            set -euo pipefail
+            archive_path="$(find dist -type f -name "*.tar.gz" -print -quit)"
+            if [ -z "$archive_path" ] || [ ! -s "$archive_path" ]; then
+              echo "Packaged archive is missing or empty."
+              exit 1
+            fi
+
+            checksum_path="${archive_path}.sha256"
+            if [ ! -s "$checksum_path" ]; then
+              echo "Checksum file is missing or empty."
+              exit 1
+            fi
+
+            tar -tzf "$archive_path" >/dev/null
+
+      - store_artifacts:
+          path: dist
+          destination: prune-guard-macos
+
+  windows-build-package:
+    executor: win/default
+    steps:
+      - checkout
+      - run:
+          name: Enforce PR-to-main guard
+          shell: powershell.exe -ExecutionPolicy Bypass
+          command: |
+            $prUrl = if ($env:CIRCLE_PULL_REQUEST) { $env:CIRCLE_PULL_REQUEST } elseif ($env:CIRCLE_PULL_REQUESTS) { ($env:CIRCLE_PULL_REQUESTS -split ',')[0] } else { '' }
+
+            if (-not $prUrl) {
+              Write-Host "No pull request context found; halting."
+              circleci-agent step halt
+              exit 0
+            }
+
+            $prNumber = ($prUrl -split '/')[-1]
+            $apiUrl = "https://api.github.com/repos/$env:CIRCLE_PROJECT_USERNAME/$env:CIRCLE_PROJECT_REPONAME/pulls/$prNumber"
+
+            $headers = @{ Accept = 'application/vnd.github+json' }
+            if ($env:GITHUB_TOKEN) {
+              $headers.Authorization = "Bearer $env:GITHUB_TOKEN"
+            }
+
+            try {
+              $payload = Invoke-RestMethod -Method Get -Uri $apiUrl -Headers $headers
+            } catch {
+              Write-Host "Failed to fetch PR metadata for $prUrl; refusing to proceed."
+              exit 1
+            }
+
+            $baseRef = $payload.base.ref
+            if (-not $baseRef) {
+              Write-Host "Could not resolve PR base branch; refusing to proceed."
+              exit 1
+            }
+
+            if ($baseRef -ne 'main') {
+              Write-Host "PR targets '$baseRef', not 'main'; halting."
+              circleci-agent step halt
+              exit 0
+            }
+
+      - run:
+          name: Install Rust if missing
+          shell: powershell.exe -ExecutionPolicy Bypass
+          command: |
+            if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) {
+              choco install rustup.install -y
+              rustup default stable
+            }
+
+      - run:
+          name: Run tests
+          shell: powershell.exe -ExecutionPolicy Bypass
+          command: cargo test --locked
+
+      - run:
+          name: Build release
+          shell: powershell.exe -ExecutionPolicy Bypass
+          command: cargo build --release --locked
+
+      - run:
+          name: Smoke test release outputs
+          shell: powershell.exe -ExecutionPolicy Bypass
+          command: |
+            $releaseDir = Join-Path $PWD 'target/release'
+            if (-not (Test-Path -LiteralPath $releaseDir)) {
+              throw "Release directory missing: $releaseDir"
+            }
+
+            $nonEmpty = Get-ChildItem -LiteralPath $releaseDir -Recurse -File | Where-Object { $_.Length -gt 0 } | Select-Object -First 1
+            if (-not $nonEmpty) {
+              throw "Release directory does not contain any non-empty files."
+            }
+
+      - run:
+          name: Package artifacts
+          shell: powershell.exe -ExecutionPolicy Bypass
+          command: |
+            scripts\release\package-artifacts.ps1 -WorkspaceRoot $PWD -OutputDir dist
+
+      - run:
+          name: Verify packaged artifacts
+          shell: powershell.exe -ExecutionPolicy Bypass
+          command: |
+            $archive = Get-ChildItem -LiteralPath dist -Filter *.zip -File | Select-Object -First 1
+            if (-not $archive -or $archive.Length -le 0) {
+              throw "Packaged archive is missing or empty."
+            }
+
+            $checksum = "$($archive.FullName).sha256"
+            if (-not (Test-Path -LiteralPath $checksum) -or ((Get-Item -LiteralPath $checksum).Length -le 0)) {
+              throw "Checksum file is missing or empty."
+            }
+
+      - store_artifacts:
+          path: dist
+          destination: prune-guard-windows
+
 workflows:
   version: 2
   pr-main-tests:
     jobs:
       - test:
+          filters:
+            branches:
+              ignore: main
+  cross-platform-build-distribution:
+    jobs:
+      - linux-build-package:
+          filters:
+            branches:
+              ignore: main
+      - macos-build-package:
+          filters:
+            branches:
+              ignore: main
+      - windows-build-package:
           filters:
             branches:
               ignore: main
