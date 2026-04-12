@@ -17,6 +17,15 @@ function Get-HostTriple {
   return $hostLine.Substring(6).Trim()
 }
 
+function Get-DeterministicEpochUtc {
+  # Avoid relying on UnixEpoch static properties, which are inconsistent across
+  # some Windows/.NET combinations used in CI images.
+  return [DateTime]::SpecifyKind(
+    [DateTime]::Parse('1970-01-01T00:00:00'),
+    [DateTimeKind]::Utc
+  )
+}
+
 $hostTriple = Get-HostTriple
 $releaseDir = Join-Path $WorkspaceRoot 'target/release'
 
@@ -49,8 +58,15 @@ Copy-Item -LiteralPath (Join-Path $WorkspaceRoot 'Cargo.lock') -Destination (Joi
 Copy-Item -LiteralPath (Join-Path $WorkspaceRoot 'README.md') -Destination (Join-Path $metadataRoot 'README.md')
 
 # Normalise timestamps so the archive is reproducible for the same inputs.
+$epochUtc = Get-DeterministicEpochUtc
+$epochOffset = [DateTimeOffset]::new($epochUtc)
 Get-ChildItem -LiteralPath $packageRoot -Recurse -Force | ForEach-Object {
-  $_.LastWriteTimeUtc = [DateTime]::UnixEpoch
+  try {
+    $_.LastWriteTimeUtc = $epochUtc
+  }
+  catch {
+    throw "Failed to set deterministic timestamp on '$($_.FullName)': $($_.Exception.Message)"
+  }
 }
 
 $archivePath = Join-Path $OutputDir ("$packageName.zip")
@@ -81,7 +97,7 @@ $zip = New-Object -TypeName System.IO.Compression.ZipArchive -ArgumentList @(
     foreach ($file in $files) {
       $relativePath = [System.IO.Path]::GetRelativePath($packageRoot, $file.FullName).Replace('\', '/')
       $entry = $zip.CreateEntry($relativePath, [System.IO.Compression.CompressionLevel]::Optimal)
-      $entry.LastWriteTime = [DateTimeOffset]::UnixEpoch
+      $entry.LastWriteTime = $epochOffset
 
       $entryStream = $entry.Open()
       try {
