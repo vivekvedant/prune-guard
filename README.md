@@ -19,6 +19,7 @@ It reclaims disk space by removing unused artifacts while defaulting to conserva
 - Docker and Podman backend adapters
 - Reliability controls (retries, lock, no-op on full backend failure)
 - Observability/security preflight checks
+- Cross-platform build and packaging pipeline (Linux/macOS/Windows)
 
 ## Project Structure
 
@@ -58,6 +59,7 @@ cargo test --locked
 - [Reliability and Error Handling](docs/reliability-and-error-handling.md)
 - [Observability Security Portability](docs/observability-security-portability.md)
 - [Release Readiness](docs/release-readiness.md)
+- [Cross-Platform Build and Distribution](docs/cross-platform-build-distribution.md)
 
 ## Flowcharts
 
@@ -71,4 +73,4 @@ cargo test --locked
 - [Reliability and Error Handling](flowcharts/reliability-and-error-handling.md)
 - [Observability Security Portability](flowcharts/observability-security-portability.md)
 - [Release Readiness](flowcharts/release-readiness.md)
-
+- [Cross-Platform Build and Distribution](flowcharts/cross-platform-build-distribution.md)

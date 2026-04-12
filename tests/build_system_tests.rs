@@ -1,0 +1,219 @@
+use std::fs;
+use std::path::{Path, PathBuf};
+
+fn repo_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+}
+
+fn read_text(path: &Path) -> String {
+    fs::read_to_string(path).unwrap_or_else(|err| {
+        panic!("failed to read {}: {err}", path.display());
+    })
+}
+
+fn contains_case_insensitive(haystack: &str, needle: &str) -> bool {
+    haystack.to_ascii_lowercase().contains(&needle.to_ascii_lowercase())
+}
+
+fn assert_has_build_system_language(path: &Path) {
+    let content = read_text(path);
+    assert!(
+        contains_case_insensitive(&content, "linux"),
+        "{} must mention Linux",
+        path.display()
+    );
+    assert!(
+        contains_case_insensitive(&content, "macos"),
+        "{} must mention macOS",
+        path.display()
+    );
+    assert!(
+        contains_case_insensitive(&content, "windows"),
+        "{} must mention Windows",
+        path.display()
+    );
+    assert!(
+        contains_case_insensitive(&content, "build matrix"),
+        "{} must mention a build matrix",
+        path.display()
+    );
+    assert!(
+        contains_case_insensitive(&content, "checksum"),
+        "{} must mention checksums",
+        path.display()
+    );
+    assert!(
+        contains_case_insensitive(&content, "smoke test"),
+        "{} must mention smoke tests",
+        path.display()
+    );
+    assert!(
+        contains_case_insensitive(&content, "fail-closed")
+            || contains_case_insensitive(&content, "fail closed"),
+        "{} must mention fail-closed release behavior",
+        path.display()
+    );
+    assert!(
+        contains_case_insensitive(&content, "dry-run"),
+        "{} must mention dry-run behavior",
+        path.display()
+    );
+}
+
+#[test]
+fn build_workflow_exists_and_has_cross_platform_matrix() {
+    let root = repo_root();
+    let workflow = read_text(&root.join(".github/workflows/build-cross-platform.yml"));
+
+    assert!(
+        contains_case_insensitive(&workflow, "ubuntu-latest"),
+        "workflow must include linux runner"
+    );
+    assert!(
+        contains_case_insensitive(&workflow, "macos-latest"),
+        "workflow must include macOS runner"
+    );
+    assert!(
+        contains_case_insensitive(&workflow, "windows-latest"),
+        "workflow must include windows runner"
+    );
+    assert!(
+        contains_case_insensitive(&workflow, "cargo test --locked"),
+        "workflow must run locked tests on each target"
+    );
+    assert!(
+        contains_case_insensitive(&workflow, "cargo build --release --locked"),
+        "workflow must run locked release builds on each target"
+    );
+    assert!(
+        contains_case_insensitive(&workflow, "smoke test release outputs"),
+        "workflow must include release smoke tests"
+    );
+    assert!(
+        contains_case_insensitive(&workflow, "actions/upload-artifact@v4"),
+        "workflow must upload build artifacts"
+    );
+    assert!(
+        contains_case_insensitive(&workflow, "if-no-files-found: error"),
+        "artifact upload should fail closed when files are missing"
+    );
+    assert!(
+        contains_case_insensitive(&workflow, "scripts/release/package-artifacts.sh"),
+        "workflow must package artifacts on unix targets"
+    );
+    assert!(
+        contains_case_insensitive(&workflow, "scripts/release/package-artifacts.ps1"),
+        "workflow must package artifacts on windows targets"
+    );
+}
+
+#[test]
+fn packaging_scripts_generate_sha256_checksums() {
+    let root = repo_root();
+    let shell_script = read_text(&root.join("scripts/release/package-artifacts.sh"));
+    let ps_script = read_text(&root.join("scripts/release/package-artifacts.ps1"));
+
+    assert!(
+        contains_case_insensitive(&shell_script, ".sha256"),
+        "unix packaging script must emit sha256 files"
+    );
+    assert!(
+        contains_case_insensitive(&shell_script, "sha256sum")
+            || contains_case_insensitive(&shell_script, "shasum -a 256"),
+        "unix packaging script must compute SHA256 digests"
+    );
+    assert!(
+        contains_case_insensitive(&ps_script, ".sha256"),
+        "windows packaging script must emit sha256 files"
+    );
+    assert!(
+        contains_case_insensitive(&ps_script, "Get-FileHash -Algorithm SHA256"),
+        "windows packaging script must compute SHA256 digests"
+    );
+}
+
+#[test]
+fn build_system_docs_and_flowcharts_are_indexed() {
+    let root = repo_root();
+    let docs_readme = read_text(&root.join("docs/README.md"));
+    let flowcharts_readme = read_text(&root.join("flowcharts/README.md"));
+
+    assert!(
+        contains_case_insensitive(&docs_readme, "cross-platform-build-distribution.md"),
+        "docs/README.md must list the cross-platform build doc"
+    );
+    assert!(
+        contains_case_insensitive(
+            &flowcharts_readme,
+            "cross-platform-build-distribution.md"
+        ),
+        "flowcharts/README.md must list the cross-platform build flowchart"
+    );
+}
+
+#[test]
+fn build_docs_exist_and_cover_required_release_steps() {
+    let root = repo_root();
+    let docs_build = root.join("docs/cross-platform-build-distribution.md");
+    let flowchart_build = root.join("flowcharts/cross-platform-build-distribution.md");
+
+    assert!(
+        docs_build.exists(),
+        "expected docs/cross-platform-build-distribution.md"
+    );
+    assert!(
+        flowchart_build.exists(),
+        "expected flowcharts/cross-platform-build-distribution.md"
+    );
+
+    let docs_content = read_text(&docs_build);
+    assert_has_build_system_language(&docs_build);
+    assert!(
+        contains_case_insensitive(&docs_content, "cross-platform build matrix"),
+        "{} must include a build matrix section",
+        docs_build.display()
+    );
+    assert!(
+        contains_case_insensitive(&docs_content, "artifact packaging"),
+        "{} must include an artifact packaging section",
+        docs_build.display()
+    );
+    assert!(
+        contains_case_insensitive(&docs_content, "checksums and integrity"),
+        "{} must include a checksum section",
+        docs_build.display()
+    );
+    assert!(
+        contains_case_insensitive(&docs_content, "smoke test gate"),
+        "{} must include a smoke-test gate section",
+        docs_build.display()
+    );
+    assert!(
+        contains_case_insensitive(&docs_content, "fail-closed release policy"),
+        "{} must include a fail-closed release policy section",
+        docs_build.display()
+    );
+
+    let flow_content = read_text(&flowchart_build);
+    assert_has_build_system_language(&flowchart_build);
+    assert!(
+        contains_case_insensitive(&flow_content, "build matrix flow"),
+        "{} must include a build matrix flow",
+        flowchart_build.display()
+    );
+    assert!(
+        contains_case_insensitive(&flow_content, "integrity and smoke test flow"),
+        "{} must include an integrity and smoke test flow",
+        flowchart_build.display()
+    );
+    assert!(
+        contains_case_insensitive(&flow_content, "release gate flow"),
+        "{} must include a release gate flow",
+        flowchart_build.display()
+    );
+    assert!(
+        contains_case_insensitive(&flow_content, "flowchart td"),
+        "{} must be a mermaid flowchart document",
+        flowchart_build.display()
+    );
+}
