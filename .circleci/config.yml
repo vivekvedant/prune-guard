@@ -28,8 +28,8 @@ jobs:
 workflows:
   version: 2
   pr-main-tests:
+    # Run only for pull request pipelines that target main.
+    # This avoids push-only branch filters that would skip PR branch runs.
+    when: pipeline.event.name == "pull_request" and pipeline.event.github.pull_request.base.ref == "main"
     jobs:
-      - test:
-          filters:
-            branches:
-              only: main
+      - test

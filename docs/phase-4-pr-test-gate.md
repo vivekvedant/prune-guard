@@ -27,6 +27,10 @@ CircleCI behavior:
 - Uses `cimg/rust:1.94` instead of the floating `cimg/rust:stable` alias.
 - Avoids `manifest unknown` pull failures caused by missing alias tags.
 - Keeps runtime predictable by pinning to a concrete Rust image line.
+- Uses workflow-level `when` conditions to run only when:
+  - `pipeline.event.name == "pull_request"`
+  - `pipeline.event.github.pull_request.base.ref == "main"`
+- Avoids `branches: only: main` because that is push-based and can skip PR branch pipelines.
 
 ## Safety Rationale
 
@@ -39,6 +43,7 @@ CircleCI behavior:
 
 - `tests/circleci_config_tests.rs` enforces that CircleCI uses a versioned `cimg/rust` tag.
 - The test fails if `:stable` is reintroduced, preventing recurrence of alias-related pull outages.
+- `tests/circleci_config_tests.rs` enforces that CircleCI trigger logic is PR-to-main only.
 
 ## Merge Gate Requirement
 
