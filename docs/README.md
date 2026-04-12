@@ -16,6 +16,7 @@ This folder contains project documentation beyond top-level requirement and proc
 - `phase-4-pr-test-gate.md`: PR-to-main CI test gate and merge-protection guidance
 - `phase-5-docker-backend.md`: Phase 5 Docker adapter behavior, safety checks, and test coverage
 - `phase-6-podman-backend.md`: Phase 6 Podman adapter parity behavior, graceful degradation, and test coverage
+- `phase-7-reliability-error-handling.md`: Phase 7 retry/backoff, partial-failure continuation, locking, and fail-closed reliability behavior
 
 ## Rules
 

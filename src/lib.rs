@@ -26,6 +26,8 @@ pub mod executor;
 pub mod planner;
 /// Fail-closed policy engine for candidate selection.
 pub mod policy;
+/// Reliability orchestration (retries, lock, and multi-backend continuation).
+pub mod reliability;
 /// Scheduler/watermark loop orchestration for periodic daemon ticks.
 pub mod scheduler;
 
@@ -46,5 +48,10 @@ pub use error::{CleanupError, Result};
 pub use executor::{ActionExecutionFailure, CleanupExecutor, ExecutionReport};
 pub use planner::CleanupPlanner;
 pub use policy::{PolicyEngine, PolicyEvaluation};
+pub use reliability::{
+    BackendCycleRunner, BackendReliabilityReport, BackendRunStatus, FileInstanceLock, InstanceGuard,
+    NoopInstanceLock, ReliabilityCoordinator, ReliabilityRunSummary, RetryPolicy, RetrySleeper,
+    SchedulerBackendRunner, ThreadSleeper,
+};
 pub use podman_backend::PodmanBackend;
 pub use scheduler::{CleanupScheduler, SchedulerRunReport, SchedulerStopReason};

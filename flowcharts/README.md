@@ -16,6 +16,7 @@ This folder stores standalone flowchart documents for runtime, safety, and workf
 - `phase-4-pr-test-gate.md`: standalone PR-to-main CI gate and merge rule flowchart
 - `phase-5-docker-backend.md`: standalone Phase 5 Docker backend discovery/execution safety flowcharts
 - `phase-6-podman-backend.md`: standalone Phase 6 Podman backend parity and graceful-degradation flowcharts
+- `phase-7-reliability-error-handling.md`: standalone Phase 7 retry/backoff, lock, and fail-closed reliability flowcharts
 
 ## Rules
 
