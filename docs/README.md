@@ -14,6 +14,7 @@ This folder contains project documentation beyond top-level requirement and proc
 - `phase-3-planner-executor.md`: Phase 3 planning, delete-cap enforcement, and safe execution behavior
 - `phase-4-scheduler-watermark-loop.md`: Phase 4 scheduler contract, watermark stop conditions, and fail-closed behavior
 - `phase-4-pr-test-gate.md`: PR-to-main CI test gate and merge-protection guidance
+- `phase-5-docker-backend.md`: Phase 5 Docker adapter behavior, safety checks, and test coverage
 
 ## Rules
 

@@ -14,6 +14,7 @@ This folder stores standalone flowchart documents for runtime, safety, and workf
 - `phase-3-planner-executor.md`: standalone Phase 3 planning/execution safety flowcharts
 - `phase-4-scheduler-watermark-loop.md`: standalone Phase 4 scheduler watermark loop and fail-closed exit flowcharts
 - `phase-4-pr-test-gate.md`: standalone PR-to-main CI gate and merge rule flowchart
+- `phase-5-docker-backend.md`: standalone Phase 5 Docker backend discovery/execution safety flowcharts
 
 ## Rules
 

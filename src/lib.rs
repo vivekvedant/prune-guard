@@ -14,6 +14,8 @@ pub mod backend;
 pub mod config;
 /// Shared domain models used across scheduler/policy/planner/executor phases.
 pub mod domain;
+/// Docker backend adapter implementation (Phase 5).
+pub mod docker_backend;
 /// Shared error type for all crate operations.
 pub mod error;
 /// Batch executor with dry-run and timeout guards.
@@ -37,6 +39,7 @@ pub use domain::{
     CleanupConfig, DaemonConfig, ExecutionMode, ExecutionRequest, ExecutionResponse, HealthReport,
     PlannedAction, ResourceKind, SkippedCandidate, UsageSnapshot,
 };
+pub use docker_backend::{CommandRunner, DockerBackend, OsCommandRunner};
 pub use error::{CleanupError, Result};
 pub use executor::{ActionExecutionFailure, CleanupExecutor, ExecutionReport};
 pub use planner::CleanupPlanner;
