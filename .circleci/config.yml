@@ -1,0 +1,35 @@
+# .circleci/config.yml
+version: 2.1
+
+jobs:
+  test:
+    docker:
+      - image: cimg/rust:stable   # Rust preinstalled image
+    steps:
+      - checkout
+
+      # Cache cargo dependencies
+      - restore_cache:
+          keys:
+            - cargo-{{ checksum "Cargo.lock" }}
+
+      # Run tests
+      - run:
+          name: Run full test suite
+          command: cargo test --all-targets --all-features --locked
+
+      # Save cache
+      - save_cache:
+          paths:
+            - ~/.cargo
+            - target
+          key: cargo-{{ checksum "Cargo.lock" }}
+
+workflows:
+  version: 2
+  pr-main-tests:
+    jobs:
+      - test:
+          filters:
+            branches:
+              only: main
