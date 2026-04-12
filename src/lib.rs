@@ -16,6 +16,8 @@ pub mod config;
 pub mod domain;
 /// Docker backend adapter implementation (Phase 5).
 pub mod docker_backend;
+/// Podman backend adapter implementation (Phase 6).
+pub mod podman_backend;
 /// Shared error type for all crate operations.
 pub mod error;
 /// Batch executor with dry-run and timeout guards.
@@ -44,4 +46,5 @@ pub use error::{CleanupError, Result};
 pub use executor::{ActionExecutionFailure, CleanupExecutor, ExecutionReport};
 pub use planner::CleanupPlanner;
 pub use policy::{PolicyEngine, PolicyEvaluation};
+pub use podman_backend::PodmanBackend;
 pub use scheduler::{CleanupScheduler, SchedulerRunReport, SchedulerStopReason};
