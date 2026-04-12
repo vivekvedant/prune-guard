@@ -18,9 +18,11 @@ This folder stores standalone flowchart documents for runtime, safety, and workf
 - `phase-6-podman-backend.md`: standalone Phase 6 Podman backend parity and graceful-degradation flowcharts
 - `phase-7-reliability-error-handling.md`: standalone Phase 7 retry/backoff, lock, and fail-closed reliability flowcharts
 - `phase-8-observability-security-portability.md`: standalone Phase 8 structured logging, preflight security, and portability flowcharts
+- `phase-9-release-readiness.md`: standalone Phase 9 documentation alignment, release runbook, and PR checklist flowcharts
 
 ## Rules
 
 - Keep diagrams synchronized with AGENTS.md and requirement.md.
 - Any behavior change MUST update the related flowchart.
 - Safety diagrams should reflect fail-closed behavior and dry-run as the default path.
+- Release-readiness diagrams should show the review gate, documentation alignment, and abort path explicitly.
