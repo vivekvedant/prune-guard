@@ -29,10 +29,14 @@ CircleCI behavior:
 - Keeps runtime predictable by pinning to a concrete Rust image line.
 - Uses an OAuth-safe guard step that:
   - halts when `CIRCLE_PULL_REQUEST` is missing
+  - falls back to `CIRCLE_PULL_REQUESTS` when present
   - fetches PR metadata from GitHub API
   - halts unless PR `base.ref` is `main`
+- Exits cleanly (`step halt` + `exit 0`) for non-PR or non-targeted pipelines so skipped runs do not appear as failures.
+- Fails fast (`exit 1`) when PR metadata cannot be fetched or parsed for an actual PR context.
 - Avoids unsupported `pipeline.event.*` variables on OAuth projects.
 - Avoids `branches: only: main` because that is push-based and can skip PR branch pipelines.
+- Adds `branches.ignore: main` to avoid direct main push pipelines for this PR-only workflow.
 
 ## Safety Rationale
 
@@ -46,6 +50,7 @@ CircleCI behavior:
 - `tests/circleci_config_tests.rs` enforces that CircleCI uses a versioned `cimg/rust` tag.
 - The test fails if `:stable` is reintroduced, preventing recurrence of alias-related pull outages.
 - `tests/circleci_config_tests.rs` enforces OAuth-safe PR-to-main guard logic and rejects unsupported `pipeline.event.*` variables.
+- Regression checks also enforce clean skip behavior (`exit 0`) and `main` push filtering.
 
 ## Merge Gate Requirement
 

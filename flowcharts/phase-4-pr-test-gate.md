@@ -26,18 +26,22 @@ Notes:
 
 ```mermaid
 flowchart TD
-    A[CircleCI job starts] --> B{CIRCLE_PULL_REQUEST set?}
-    B -- No --> C[Halt step fail-closed]
-    B -- Yes --> D[Fetch PR metadata from GitHub API]
-    D --> E{PR base.ref == main?}
-    E -- No --> C
-    E -- Yes --> F[Pull cimg/rust:1.94]
-    F --> G{Image manifest available?}
-    G -- No --> H[Fail job early and stop execution]
-    G -- Yes --> I[Run cargo test --all-targets --all-features --locked]
-    I --> J{Tests passed?}
-    J -- No --> K[Fail gate]
-    J -- Yes --> L[Pass gate]
+    A[CircleCI job starts] --> B{Branch is main push?}
+    B -- Yes --> C[Workflow filtered out]
+    B -- No --> D{PR URL available via CIRCLE_PULL_REQUEST or CIRCLE_PULL_REQUESTS?}
+    D -- No --> E[step halt + exit 0]
+    D -- Yes --> F[Fetch PR metadata from GitHub API]
+    F --> G{Metadata fetch/parse succeeded?}
+    G -- No --> H[exit 1 fail-closed]
+    G -- Yes --> I{PR base.ref == main?}
+    I -- No --> E
+    I -- Yes --> J[Pull cimg/rust:1.94]
+    J --> K{Image manifest available?}
+    K -- No --> L[Fail job early and stop execution]
+    K -- Yes --> M[Run cargo test --all-targets --all-features --locked]
+    M --> N{Tests passed?}
+    N -- No --> O[Fail gate]
+    N -- Yes --> P[Pass gate]
 ```
 
 Notes:
@@ -45,3 +49,4 @@ Notes:
 - Pinning the image tag avoids non-deterministic alias resolution failures.
 - If image pull cannot be resolved, the pipeline stops without running partial validation.
 - OAuth-safe guard logic scopes execution to pull requests targeting `main`.
+- Non-targeted runs halt cleanly, while ambiguous PR metadata fails the job for real PR contexts.

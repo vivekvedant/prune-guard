@@ -15,12 +15,19 @@ jobs:
       - run:
           name: Enforce PR-to-main guard
           command: |
-            if [ -z "${CIRCLE_PULL_REQUEST:-}" ]; then
-              echo "No pull request context found; halting."
-              circleci-agent step halt
+            pr_url="${CIRCLE_PULL_REQUEST:-}"
+            if [ -z "${pr_url}" ] && [ -n "${CIRCLE_PULL_REQUESTS:-}" ]; then
+              # Some OAuth pipelines expose a comma-separated PR URL list.
+              pr_url="$(printf '%s' "${CIRCLE_PULL_REQUESTS}" | cut -d',' -f1)"
             fi
 
-            pr_number="${CIRCLE_PULL_REQUEST##*/}"
+            if [ -z "${pr_url}" ]; then
+              echo "No pull request context found; halting."
+              circleci-agent step halt
+              exit 0
+            fi
+
+            pr_number="${pr_url##*/}"
             api_url="https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/pulls/${pr_number}"
 
             auth_header=()
@@ -28,17 +35,22 @@ jobs:
               auth_header=(-H "Authorization: Bearer ${GITHUB_TOKEN}")
             fi
 
-            payload="$(curl -fsSL "${auth_header[@]}" -H "Accept: application/vnd.github+json" "${api_url}" | tr -d '\n')"
+            if ! payload="$(curl -fsSL "${auth_header[@]}" -H "Accept: application/vnd.github+json" "${api_url}" | tr -d '\n')"; then
+              echo "Failed to fetch PR metadata for ${pr_url}; refusing to proceed."
+              exit 1
+            fi
+
             base_ref="$(printf '%s' "${payload}" | sed -n 's/.*"base":[[:space:]]*{[^}]*"ref":[[:space:]]*"\([^"]*\)".*/\1/p')"
 
             if [ -z "${base_ref}" ]; then
-              echo "Could not resolve PR base branch; halting fail-closed."
-              circleci-agent step halt
+              echo "Could not resolve PR base branch; refusing to proceed."
+              exit 1
             fi
 
             if [ "${base_ref}" != "main" ]; then
               echo "PR targets '${base_ref}', not 'main'; halting."
               circleci-agent step halt
+              exit 0
             fi
 
       # Cache cargo dependencies
@@ -62,4 +74,7 @@ workflows:
   version: 2
   pr-main-tests:
     jobs:
-      - test
+      - test:
+          filters:
+            branches:
+              ignore: main
