@@ -28,6 +28,8 @@ pub mod planner;
 pub mod policy;
 /// Phase 8 observability, security, and portability checks.
 pub mod observability;
+/// Reliability orchestration (retries, lock, and multi-backend continuation).
+pub mod reliability;
 /// Scheduler/watermark loop orchestration for periodic daemon ticks.
 pub mod scheduler;
 
@@ -54,5 +56,10 @@ pub use observability::{
 };
 pub use planner::CleanupPlanner;
 pub use policy::{PolicyEngine, PolicyEvaluation};
+pub use reliability::{
+    BackendCycleRunner, BackendReliabilityReport, BackendRunStatus, FileInstanceLock, InstanceGuard,
+    NoopInstanceLock, ReliabilityCoordinator, ReliabilityRunSummary, RetryPolicy, RetrySleeper,
+    SchedulerBackendRunner, ThreadSleeper,
+};
 pub use podman_backend::PodmanBackend;
 pub use scheduler::{CleanupScheduler, SchedulerRunReport, SchedulerStopReason};
