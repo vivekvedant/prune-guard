@@ -16,6 +16,8 @@ pub mod config;
 pub mod domain;
 /// Shared error type for all crate operations.
 pub mod error;
+/// Fail-closed policy engine for candidate selection.
+pub mod policy;
 
 pub use backend::{
     ActionPlanner, ActionPlannerContract, CandidateDiscoverer, CandidateDiscovererContract,
@@ -30,3 +32,4 @@ pub use domain::{
     PlannedAction, ResourceKind, SkippedCandidate, UsageSnapshot,
 };
 pub use error::{CleanupError, Result};
+pub use policy::{PolicyEngine, PolicyEvaluation};
