@@ -16,6 +16,10 @@ pub mod config;
 pub mod domain;
 /// Shared error type for all crate operations.
 pub mod error;
+/// Batch executor with dry-run and timeout guards.
+pub mod executor;
+/// Deterministic action planner with per-run delete-cap enforcement.
+pub mod planner;
 /// Fail-closed policy engine for candidate selection.
 pub mod policy;
 
@@ -32,4 +36,6 @@ pub use domain::{
     PlannedAction, ResourceKind, SkippedCandidate, UsageSnapshot,
 };
 pub use error::{CleanupError, Result};
+pub use executor::{ActionExecutionFailure, CleanupExecutor, ExecutionReport};
+pub use planner::CleanupPlanner;
 pub use policy::{PolicyEngine, PolicyEvaluation};

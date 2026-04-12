@@ -11,6 +11,8 @@ This folder contains project documentation beyond top-level requirement and proc
 - Phase 1 implementation notes: project layout, config loading, backend interfaces, baseline tests
 - `phase-1-core-skeleton.md`: Phase 1 architecture, safety defaults, contracts, and test coverage
 - `phase-2-policy-engine.md`: Phase 2 fail-closed policy filtering, reject reasons, and test coverage
+- `phase-3-planner-executor.md`: Phase 3 planning, delete-cap enforcement, and safe execution behavior
+- `phase-4-pr-test-gate.md`: PR-to-main CI test gate and merge-protection guidance
 
 ## Rules
 

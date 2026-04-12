@@ -201,7 +201,10 @@ fn evaluate_candidates_is_deterministic_and_preserves_input_order() {
     let PolicyEvaluation { accepted, skipped } = engine.evaluate_candidates(candidates);
 
     let accepted_ids: Vec<&str> = accepted.iter().map(|c| c.identifier.as_str()).collect();
-    let skipped_ids: Vec<&str> = skipped.iter().map(|s| s.candidate.identifier.as_str()).collect();
+    let skipped_ids: Vec<&str> = skipped
+        .iter()
+        .map(|s| s.candidate.identifier.as_str())
+        .collect();
 
     assert_eq!(accepted_ids, vec!["img-1", "img-3"]);
     assert_eq!(skipped_ids, vec!["img-2"]);
