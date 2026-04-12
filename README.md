@@ -72,6 +72,3 @@ cargo test --locked
 - [Observability Security Portability](flowcharts/observability-security-portability.md)
 - [Release Readiness](flowcharts/release-readiness.md)
 
-## CI Policy
-
-The CircleCI workflow is intended to run for pull requests targeting `main`, with guardrails that halt non-targeted runs and fail closed on ambiguous PR metadata.
