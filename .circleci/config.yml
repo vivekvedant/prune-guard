@@ -8,6 +8,39 @@ jobs:
     steps:
       - checkout
 
+      # OAuth-safe trigger guard:
+      # - skip non-PR pipelines
+      # - skip PRs not targeting main
+      # This avoids unsupported `pipeline.event.*` variables on OAuth projects.
+      - run:
+          name: Enforce PR-to-main guard
+          command: |
+            if [ -z "${CIRCLE_PULL_REQUEST:-}" ]; then
+              echo "No pull request context found; halting."
+              circleci-agent step halt
+            fi
+
+            pr_number="${CIRCLE_PULL_REQUEST##*/}"
+            api_url="https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/pulls/${pr_number}"
+
+            auth_header=()
+            if [ -n "${GITHUB_TOKEN:-}" ]; then
+              auth_header=(-H "Authorization: Bearer ${GITHUB_TOKEN}")
+            fi
+
+            payload="$(curl -fsSL "${auth_header[@]}" -H "Accept: application/vnd.github+json" "${api_url}" | tr -d '\n')"
+            base_ref="$(printf '%s' "${payload}" | sed -n 's/.*"base":[[:space:]]*{[^}]*"ref":[[:space:]]*"\([^"]*\)".*/\1/p')"
+
+            if [ -z "${base_ref}" ]; then
+              echo "Could not resolve PR base branch; halting fail-closed."
+              circleci-agent step halt
+            fi
+
+            if [ "${base_ref}" != "main" ]; then
+              echo "PR targets '${base_ref}', not 'main'; halting."
+              circleci-agent step halt
+            fi
+
       # Cache cargo dependencies
       - restore_cache:
           keys:
@@ -28,8 +61,5 @@ jobs:
 workflows:
   version: 2
   pr-main-tests:
-    # Run only for pull request pipelines that target main.
-    # This avoids push-only branch filters that would skip PR branch runs.
-    when: pipeline.event.name == "pull_request" and pipeline.event.github.pull_request.base.ref == "main"
     jobs:
       - test

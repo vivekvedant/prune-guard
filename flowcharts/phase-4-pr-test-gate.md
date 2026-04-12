@@ -26,12 +26,12 @@ Notes:
 
 ```mermaid
 flowchart TD
-    A[Pipeline event received] --> B{event == pull_request?}
-    B -- No --> C[Skip workflow]
-    B -- Yes --> D{PR base.ref == main?}
-    D -- No --> C
-    D -- Yes --> E[Start CircleCI test job]
-    E --> F[Pull cimg/rust:1.94]
+    A[CircleCI job starts] --> B{CIRCLE_PULL_REQUEST set?}
+    B -- No --> C[Halt step fail-closed]
+    B -- Yes --> D[Fetch PR metadata from GitHub API]
+    D --> E{PR base.ref == main?}
+    E -- No --> C
+    E -- Yes --> F[Pull cimg/rust:1.94]
     F --> G{Image manifest available?}
     G -- No --> H[Fail job early and stop execution]
     G -- Yes --> I[Run cargo test --all-targets --all-features --locked]
@@ -44,4 +44,4 @@ Notes:
 
 - Pinning the image tag avoids non-deterministic alias resolution failures.
 - If image pull cannot be resolved, the pipeline stops without running partial validation.
-- Workflow conditions scope CircleCI execution to pull requests targeting `main`.
+- OAuth-safe guard logic scopes execution to pull requests targeting `main`.

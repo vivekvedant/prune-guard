@@ -27,15 +27,19 @@ fn circleci_workflow_triggers_only_for_pull_requests_to_main() {
         .expect("CI config must be readable for trigger validation");
 
     assert!(
-        config.contains("pipeline.event.name == \"pull_request\""),
-        "workflow must explicitly target pull_request events"
+        config.contains("CIRCLE_PULL_REQUEST"),
+        "workflow must guard for pull request context in an OAuth-safe way"
     );
     assert!(
-        config.contains("pipeline.event.github.pull_request.base.ref == \"main\""),
-        "workflow must explicitly target pull requests whose base branch is main"
+        config.contains("/pulls/${pr_number}"),
+        "workflow must query PR metadata to resolve the base branch"
     );
     assert!(
-        !config.contains("branches:\n              only: main"),
-        "branch-only filters are push-based and should not be used for PR-to-main-only workflows"
+        config.contains("if [ \"${base_ref}\" != \"main\" ]"),
+        "workflow must halt when PR target branch is not main"
+    );
+    assert!(
+        !config.contains("pipeline.event.name"),
+        "OAuth projects do not expose pipeline.event.* values; config must avoid unsupported variables"
     );
 }
