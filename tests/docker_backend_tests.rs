@@ -2,10 +2,10 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::sync::{Arc, Mutex};
 
 use prune_guard::backend::{CandidateDiscoverer, ExecutionContract, HealthCheck, UsageCollector};
+use prune_guard::docker_backend::{CommandRunner, DockerBackend};
 use prune_guard::{
     BackendKind, CandidateDiscoveryRequest, CleanupActionKind, CleanupConfig, CleanupError,
-    CommandRunner, DockerBackend, ExecutionMode, ExecutionRequest, PlannedAction, ResourceKind,
-    UsageSnapshot,
+    ExecutionMode, ExecutionRequest, PlannedAction, ResourceKind, UsageSnapshot,
 };
 
 #[test]
