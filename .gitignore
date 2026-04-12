@@ -1,0 +1,27 @@
+# OS-generated files
+.DS_Store
+Thumbs.db
+
+# Editor/IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Rust build outputs
+/target/
+
+# Cargo
+# Keep Cargo.lock for applications.
+# If this repository is a library and you prefer not to commit Cargo.lock, uncomment the next line.
+# Cargo.lock
+
+# Logs and temporary files
+*.log
+tmp/
+temp/
+**/*.rs.bk
+
+# Local planning artifacts
+/plan.md
