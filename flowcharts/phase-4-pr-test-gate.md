@@ -21,3 +21,21 @@ Notes:
 
 - The workflow produces the test result signal.
 - Branch protection on `main` enforces merge blocking on failed checks.
+
+## CircleCI Image Resolution Guard
+
+```mermaid
+flowchart TD
+    A[CircleCI test job starts] --> B[Pull cimg/rust:1.94]
+    B --> C{Image manifest available?}
+    C -- No --> D[Fail job early and stop execution]
+    C -- Yes --> E[Run cargo test --all-targets --all-features --locked]
+    E --> F{Tests passed?}
+    F -- No --> G[Fail gate]
+    F -- Yes --> H[Pass gate]
+```
+
+Notes:
+
+- Pinning the image tag avoids non-deterministic alias resolution failures.
+- If image pull cannot be resolved, the pipeline stops without running partial validation.
