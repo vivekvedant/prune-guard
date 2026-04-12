@@ -1,0 +1,176 @@
+name: Build and Package Cross-Platform Artifacts
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-package:
+    name: Build, test, and package on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            package_script: scripts/release/package-artifacts.sh
+            archive_extension: tar.gz
+          - os: macos-latest
+            package_script: scripts/release/package-artifacts.sh
+            archive_extension: tar.gz
+          - os: windows-latest
+            package_script: scripts/release/package-artifacts.ps1
+            archive_extension: zip
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_TERM_COLOR: always
+      RELEASE_ARTIFACT_DIR: ${{ runner.temp }}/prune-guard-artifacts
+      SOURCE_DATE_EPOCH: "0"
+      PACKAGE_SCRIPT: ${{ matrix.package_script }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run tests
+        if: runner.os != 'Windows'
+        shell: bash
+        run: cargo test --locked
+
+      - name: Run tests
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: cargo test --locked
+
+      - name: Build release artifacts
+        if: runner.os != 'Windows'
+        shell: bash
+        run: cargo build --release --locked
+
+      - name: Build release artifacts
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: cargo build --release --locked
+
+      - name: Smoke test release outputs
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_dir="$GITHUB_WORKSPACE/target/release"
+
+          if [ ! -d "$release_dir" ]; then
+            echo "Release directory missing: $release_dir"
+            exit 1
+          fi
+
+          first_release_file="$(find "$release_dir" -type f -size +0c -print -quit)"
+          if [ -z "$first_release_file" ]; then
+            echo "Release directory does not contain any non-empty files."
+            exit 1
+          fi
+
+      - name: Smoke test release outputs
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $releaseDir = Join-Path $env:GITHUB_WORKSPACE 'target/release'
+
+          if (-not (Test-Path -LiteralPath $releaseDir)) {
+            throw "Release directory missing: $releaseDir"
+          }
+
+          $nonEmptyFile = Get-ChildItem -LiteralPath $releaseDir -Recurse -File |
+            Where-Object { $_.Length -gt 0 } |
+            Select-Object -First 1
+
+          if (-not $nonEmptyFile) {
+            throw "Release directory does not contain any non-empty files."
+          }
+
+      - name: Package artifacts
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          "$PACKAGE_SCRIPT" \
+            --workspace-root "$GITHUB_WORKSPACE" \
+            --output-dir "$RELEASE_ARTIFACT_DIR"
+
+      - name: Package artifacts
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          & $env:PACKAGE_SCRIPT `
+            -WorkspaceRoot $env:GITHUB_WORKSPACE `
+            -OutputDir $env:RELEASE_ARTIFACT_DIR
+
+      - name: Verify packaged artifacts
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive_path="$(find "$RELEASE_ARTIFACT_DIR" -type f -name "*.${{ matrix.archive_extension }}" -print -quit)"
+
+          if [ -z "$archive_path" ] || [ ! -s "$archive_path" ]; then
+            echo "Packaged archive is missing or empty."
+            exit 1
+          fi
+
+          checksum_path="${archive_path}.sha256"
+          if [ ! -s "$checksum_path" ]; then
+            echo "Checksum file is missing or empty."
+            exit 1
+          fi
+
+          if ! tar -tzf "$archive_path" >/dev/null; then
+            echo "Archive contents could not be listed."
+            exit 1
+          fi
+
+      - name: Verify packaged artifacts
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $archivePath = Get-ChildItem -LiteralPath $env:RELEASE_ARTIFACT_DIR -Filter *.zip -File | Select-Object -First 1
+
+          if (-not $archivePath -or $archivePath.Length -le 0) {
+            throw "Packaged archive is missing or empty."
+          }
+
+          $checksumPath = "$($archivePath.FullName).sha256"
+          if (-not (Test-Path -LiteralPath $checksumPath) -or ((Get-Item -LiteralPath $checksumPath).Length -le 0)) {
+            throw "Checksum file is missing or empty."
+          }
+
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = [System.IO.Compression.ZipFile]::OpenRead($archivePath.FullName)
+          try {
+            if ($zip.Entries.Count -eq 0) {
+              throw "Archive contains no entries."
+            }
+          }
+          finally {
+            $zip.Dispose()
+          }
+
+      - name: Upload packaged artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: prune-guard-${{ matrix.os }}-${{ runner.arch }}
+          path: ${{ env.RELEASE_ARTIFACT_DIR }}/*
+          if-no-files-found: error
+          retention-days: 30
