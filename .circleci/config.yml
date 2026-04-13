@@ -166,6 +166,7 @@ jobs:
             dpkg-deb --contents "$archive_path" | grep -q "/etc/prune-guard/prune-guard.toml"
             dpkg-deb --contents "$archive_path" | grep -q "/usr/bin/prune-guard"
             dpkg-deb --contents "$archive_path" | grep -q "/lib/systemd/system/prune-guard.service"
+            dpkg-deb --contents "$archive_path" | grep -q "/lib/systemd/system/prune-guard.timer"
 
       - store_artifacts:
           path: dist

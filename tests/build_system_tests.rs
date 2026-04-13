@@ -109,6 +109,10 @@ fn circleci_cross_platform_workflow_exists_and_has_required_jobs() {
         "CircleCI linux workflow must verify systemd service path inside .deb"
     );
     assert!(
+        contains_case_insensitive(&config, "/lib/systemd/system/prune-guard.timer"),
+        "CircleCI linux workflow must verify systemd timer path inside .deb"
+    );
+    assert!(
         contains_case_insensitive(&config, "ignore: main"),
         "cross-platform workflow should avoid direct main-branch push pipelines"
     );
@@ -155,25 +159,55 @@ fn packaging_scripts_generate_sha256_checksums() {
         contains_case_insensitive(&deb_script, "/lib/systemd/system/prune-guard.service"),
         "linux deb packaging script must install a systemd service unit"
     );
+    assert!(
+        contains_case_insensitive(&deb_script, "/lib/systemd/system/prune-guard.timer"),
+        "linux deb packaging script must install a systemd timer unit"
+    );
+    assert!(
+        contains_case_insensitive(&deb_script, "enable prune-guard.timer"),
+        "linux deb packaging script must enable timer-based scheduling"
+    );
 }
 
 #[test]
-fn systemd_unit_exists_and_points_to_installed_binary_and_config() {
+fn systemd_units_exist_and_point_to_oneshot_install_paths() {
     let root = repo_root();
     let unit_path = root.join("packaging/systemd/prune-guard.service");
+    let timer_path = root.join("packaging/systemd/prune-guard.timer");
     assert!(
         unit_path.exists(),
         "expected packaging/systemd/prune-guard.service"
     );
+    assert!(
+        timer_path.exists(),
+        "expected packaging/systemd/prune-guard.timer"
+    );
 
     let unit_content = read_text(&unit_path);
+    let timer_content = read_text(&timer_path);
+    assert!(
+        contains_case_insensitive(&unit_content, "type=oneshot"),
+        "systemd service must use oneshot execution mode"
+    );
     assert!(
         contains_case_insensitive(&unit_content, "execstart=/usr/bin/prune-guard"),
         "systemd unit must run the installed prune-guard binary"
     );
     assert!(
+        contains_case_insensitive(&unit_content, "--once"),
+        "systemd service must run prune-guard in one-shot mode"
+    );
+    assert!(
         contains_case_insensitive(&unit_content, "/etc/prune-guard/prune-guard.toml"),
         "systemd unit must reference installed config path"
+    );
+    assert!(
+        contains_case_insensitive(&timer_content, "onunitactivesec"),
+        "systemd timer must schedule recurring runs"
+    );
+    assert!(
+        contains_case_insensitive(&timer_content, "unit=prune-guard.service"),
+        "systemd timer must trigger prune-guard.service"
     );
 }
 

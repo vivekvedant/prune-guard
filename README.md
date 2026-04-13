@@ -20,7 +20,7 @@ It reclaims disk space by removing unused artifacts while defaulting to conserva
 - Reliability controls (retries, lock, no-op on full backend failure)
 - Observability/security preflight checks
 - Cross-platform build and packaging pipeline (Linux/macOS)
-- Linux `.deb` install path with `systemd` service unit (`prune-guard.service`)
+- Linux `.deb` install path with `systemd` oneshot service + timer (`prune-guard.service`, `prune-guard.timer`)
 
 ## Project Structure
 
@@ -51,10 +51,11 @@ sudo cp config/prune-guard.toml /etc/prune-guard/prune-guard.toml
 cargo run -- --config /etc/prune-guard/prune-guard.toml --once
 ```
 
-4. Check installed service behavior after `.deb` install:
+4. Check installed timer/service behavior after `.deb` install:
 
 ```bash
-sudo systemctl status prune-guard
+sudo systemctl status prune-guard.timer
+sudo systemctl status prune-guard.service
 journalctl -u prune-guard -n 50 --no-pager
 ```
 

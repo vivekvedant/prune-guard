@@ -21,7 +21,8 @@ This feature makes the CircleCI build matrix, packaging rules, artifact integrit
 - Linux `.deb` package includes:
   - `/usr/bin/prune-guard` daemon executable
   - `/etc/prune-guard/prune-guard.toml` config template
-  - `/lib/systemd/system/prune-guard.service` service unit
+  - `/lib/systemd/system/prune-guard.service` oneshot service unit
+  - `/lib/systemd/system/prune-guard.timer` recurring timer unit
 - macOS artifacts remain packaged as archive files with stable filenames.
 - Packaging must keep the release payload minimal and deterministic.
 - Artifact upload must happen only after the packaged bytes and checksum manifest are ready.
