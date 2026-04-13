@@ -1,6 +1,6 @@
 # Cross-Platform Build and Distribution Flowchart
 
-This flowchart captures the CircleCI build matrix, artifact packaging, checksum generation, smoke tests, and fail-closed release gate for Linux and macOS.
+This flowchart captures the CircleCI build matrix, Linux `.deb` packaging, checksum generation, smoke tests, and fail-closed release gate for Linux and macOS.
 
 ## Build Matrix Flow
 
@@ -19,7 +19,7 @@ flowchart TD
 flowchart TD
     A[Package artifacts] --> B[Generate checksums for every artifact]
     B --> C[Artifact upload for packaged binaries and checksum manifest]
-    C --> D[Run platform smoke tests]
+    C --> D[Verify Linux .deb structure and run platform smoke tests]
     D --> E{Did every smoke test pass?}
     E -- No --> F[Block release publication]
     E -- Yes --> G[Mark build set releasable]

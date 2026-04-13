@@ -17,7 +17,8 @@ This feature makes the CircleCI build matrix, packaging rules, artifact integrit
 ## Artifact Packaging and Upload
 
 - Build outputs must be packaged per platform so the release artifact is easy to install and verify.
-- Linux and macOS artifacts should be packaged in archive form with stable filenames.
+- Linux artifacts are packaged as `.deb` packages with stable filenames.
+- macOS artifacts remain packaged as archive files with stable filenames.
 - Packaging must keep the release payload minimal and deterministic.
 - Artifact upload must happen only after the packaged bytes and checksum manifest are ready.
 - CircleCI stores packaged artifacts per platform job so each target’s output is auditable independently.

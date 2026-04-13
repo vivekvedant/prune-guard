@@ -142,7 +142,7 @@ jobs:
       - run:
           name: Package artifacts
           command: |
-            bash scripts/release/package-artifacts.sh \
+            bash scripts/release/package-artifacts-deb.sh \
               --workspace-root "$PWD" \
               --output-dir dist
 
@@ -150,7 +150,7 @@ jobs:
           name: Verify packaged artifacts
           command: |
             set -euo pipefail
-            archive_path="$(find dist -type f -name "*.tar.gz" -print -quit)"
+            archive_path="$(find dist -type f -name "*.deb" -print -quit)"
             if [ -z "$archive_path" ] || [ ! -s "$archive_path" ]; then
               echo "Packaged archive is missing or empty."
               exit 1
@@ -162,7 +162,8 @@ jobs:
               exit 1
             fi
 
-            tar -tzf "$archive_path" >/dev/null
+            dpkg-deb --info "$archive_path" >/dev/null
+            dpkg-deb --contents "$archive_path" | grep -q "/etc/prune-guard/prune-guard.toml"
 
       - store_artifacts:
           path: dist
