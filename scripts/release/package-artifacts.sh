@@ -73,6 +73,7 @@ cp -R "${release_dir}/." "$release_copy_root/"
 cp "${workspace_root}/Cargo.toml" "$metadata_root/Cargo.toml"
 cp "${workspace_root}/Cargo.lock" "$metadata_root/Cargo.lock"
 cp "${workspace_root}/README.md" "$metadata_root/README.md"
+cp "${workspace_root}/config/prune-guard.toml" "$metadata_root/prune-guard.toml"
 
 # Normalize timestamps so the archive contents are reproducible for the same
 # source tree and Rust toolchain.

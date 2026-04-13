@@ -37,12 +37,19 @@ It reclaims disk space by removing unused artifacts while defaulting to conserva
 cargo test --locked
 ```
 
-2. Review documentation:
+2. Prepare install config:
+
+```bash
+sudo mkdir -p /etc/prune-guard
+sudo cp config/prune-guard.toml /etc/prune-guard/prune-guard.toml
+```
+
+3. Review documentation:
 
 - [docs/README.md](docs/README.md)
 - [flowcharts/README.md](flowcharts/README.md)
 
-3. Use release guidance before merging:
+4. Use release guidance before merging:
 
 - [docs/release-runbook.md](docs/release-runbook.md)
 - [docs/pr-checklist.md](docs/pr-checklist.md)

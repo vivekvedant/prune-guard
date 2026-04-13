@@ -6,7 +6,7 @@ This document captures the architecture-level flow. It represents contracts and 
 
 ```mermaid
 flowchart TD
-    A[Load Config] --> B{Config Valid?}
+    A[Load Config from /etc/prune-guard/prune-guard.toml] --> B{Config Valid?}
     B -- No --> C[Return Validation Error]
     B -- Yes --> D[Run Backend Health Check]
     D --> E{Backend Healthy?}

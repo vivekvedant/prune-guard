@@ -120,6 +120,28 @@ fn invalid_threshold_relationship_is_rejected() {
     );
 }
 
+#[test]
+fn install_config_template_exists_and_is_safety_first() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let install_cfg_path = repo_root.join("config/prune-guard.toml");
+
+    let cfg = Config::load_from_path(&install_cfg_path).unwrap_or_else(|err| {
+        panic!(
+            "install config template should exist and parse ({}): {err}",
+            install_cfg_path.display()
+        )
+    });
+
+    assert!(
+        cfg.dry_run,
+        "installed config template must default to dry-run fail-closed mode"
+    );
+    assert!(
+        cfg.target_watermark_percent < cfg.high_watermark_percent,
+        "installed config template must keep target watermark below high watermark"
+    );
+}
+
 fn unique_temp_path(file_name: &str) -> PathBuf {
     let mut path = std::env::temp_dir();
     let nanos = SystemTime::now()
