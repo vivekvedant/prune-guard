@@ -18,6 +18,7 @@ This folder stores standalone flowchart documents for runtime, safety, and workf
 - `reliability-and-error-handling.md`: retry/backoff, lock, and fail-closed reliability flowcharts
 - `observability-security-portability.md`: structured logging, preflight security, and portability flowcharts
 - `release-readiness.md`: documentation alignment, release runbook, and PR checklist flowcharts
+- `cross-platform-build-distribution.md`: cross-platform build matrix, artifact packaging, checksums, and fail-closed release gate flowcharts
 
 ## Rules
 

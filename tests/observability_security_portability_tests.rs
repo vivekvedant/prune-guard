@@ -123,15 +123,11 @@ fn least_privilege_check_fails_closed_for_root_or_unknown_uid() {
 }
 
 #[test]
-fn portability_matrix_accepts_linux_macos_windows() {
+fn portability_matrix_accepts_linux_and_macos_only() {
     assert_eq!(parse_supported_os("linux").expect("linux supported").as_str(), "linux");
     assert_eq!(parse_supported_os("macos").expect("macos supported").as_str(), "macos");
-    assert_eq!(
-        parse_supported_os("windows")
-            .expect("windows supported")
-            .as_str(),
-        "windows"
-    );
+    assert!(parse_supported_os("windows").is_none());
+    assert!(parse_supported_os("win32").is_none());
 }
 
 #[test]
@@ -158,6 +154,10 @@ fn supported_os_validation_returns_reasonable_report() {
     let linux = validate_supported_os("linux");
     assert!(linux.supported);
     assert_eq!(linux.normalized_os, Some("linux".to_string()));
+
+    let windows = validate_supported_os("windows");
+    assert!(!windows.supported);
+    assert!(windows.reason.contains("unsupported"));
 
     let unknown = validate_supported_os("aix");
     assert!(!unknown.supported);

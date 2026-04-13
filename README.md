@@ -19,6 +19,7 @@ It reclaims disk space by removing unused artifacts while defaulting to conserva
 - Docker and Podman backend adapters
 - Reliability controls (retries, lock, no-op on full backend failure)
 - Observability/security preflight checks
+- Cross-platform build and packaging pipeline (Linux/macOS)
 
 ## Project Structure
 
@@ -36,12 +37,19 @@ It reclaims disk space by removing unused artifacts while defaulting to conserva
 cargo test --locked
 ```
 
-2. Review documentation:
+2. Prepare install config:
+
+```bash
+sudo mkdir -p /etc/prune-guard
+sudo cp config/prune-guard.toml /etc/prune-guard/prune-guard.toml
+```
+
+3. Review documentation:
 
 - [docs/README.md](docs/README.md)
 - [flowcharts/README.md](flowcharts/README.md)
 
-3. Use release guidance before merging:
+4. Use release guidance before merging:
 
 - [docs/release-runbook.md](docs/release-runbook.md)
 - [docs/pr-checklist.md](docs/pr-checklist.md)
@@ -58,6 +66,7 @@ cargo test --locked
 - [Reliability and Error Handling](docs/reliability-and-error-handling.md)
 - [Observability Security Portability](docs/observability-security-portability.md)
 - [Release Readiness](docs/release-readiness.md)
+- [Cross-Platform Build and Distribution](docs/cross-platform-build-distribution.md)
 
 ## Flowcharts
 
@@ -71,4 +80,4 @@ cargo test --locked
 - [Reliability and Error Handling](flowcharts/reliability-and-error-handling.md)
 - [Observability Security Portability](flowcharts/observability-security-portability.md)
 - [Release Readiness](flowcharts/release-readiness.md)
-
+- [Cross-Platform Build and Distribution](flowcharts/cross-platform-build-distribution.md)

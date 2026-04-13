@@ -18,6 +18,7 @@ It does not perform real cleanup against Docker/Podman yet. It defines the share
 
 - `src/lib.rs`: crate entrypoint and public exports
 - `src/config.rs`: `Config` model, TOML subset parser, validation rules
+- `config/prune-guard.toml`: install template config (deploy to `/etc/prune-guard/prune-guard.toml`)
 - `src/domain.rs`: runtime-safe domain structs/enums
 - `src/backend.rs`: backend pipeline contracts
 - `src/error.rs`: shared error enum for all stages
@@ -49,6 +50,8 @@ The current config model supports:
 - `protected_labels`
 
 Accepted TOML forms include top-level keys and selected section aliases such as `[runtime]`, `[thresholds]`, `[cleanup]`, `[safety]`, and `[allowlists]`.
+
+For installed deployments, use `config/prune-guard.toml` as the baseline template and copy it to `/etc/prune-guard/prune-guard.toml`.
 
 ## Backend Contract (Pipeline Shape)
 

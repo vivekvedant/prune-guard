@@ -1,0 +1,27 @@
+# Prune Guard installation template.
+# Deploy this file to: /etc/prune-guard/prune-guard.toml
+#
+# Safety-first defaults:
+# - dry_run stays enabled
+# - conservative watermarks and age thresholds
+# - explicit protected lists default to empty
+
+[runtime]
+interval_secs = 900
+dry_run = true
+
+[thresholds]
+high_watermark_percent = 85
+target_watermark_percent = 70
+
+[cleanup]
+min_unused_age_days = 30
+max_delete_per_run_gb = 10
+
+[backends]
+enabled_backends = ["docker"]
+
+[allowlists]
+protected_images = []
+protected_volumes = []
+protected_labels = []
