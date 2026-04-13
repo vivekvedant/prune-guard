@@ -55,7 +55,6 @@ The implementation is in `src/observability.rs`.
 - `parse_supported_os` and `validate_supported_os` enforce platform support for:
   - Linux
   - macOS
-  - Windows
 - Unsupported OS values are treated as unsafe for real-run mode.
 
 ### Runtime Preflight Decision
@@ -82,5 +81,5 @@ The implementation is in `src/observability.rs`.
 - auditable run-summary conversion from scheduler report
 - optional metrics counter emission
 - least-privilege fail-closed behavior
-- Linux/macOS/Windows portability matrix acceptance
+- Linux/macOS portability matrix acceptance and Windows rejection
 - unsupported OS and elevated privilege preflight dry-run enforcement

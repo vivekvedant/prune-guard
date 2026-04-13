@@ -28,11 +28,6 @@ fn assert_has_build_system_language(path: &Path) {
         path.display()
     );
     assert!(
-        contains_case_insensitive(&content, "windows"),
-        "{} must mention Windows",
-        path.display()
-    );
-    assert!(
         contains_case_insensitive(&content, "build matrix"),
         "{} must mention a build matrix",
         path.display()
@@ -78,8 +73,8 @@ fn circleci_cross_platform_workflow_exists_and_has_required_jobs() {
         "CircleCI config must define macOS build/package job"
     );
     assert!(
-        contains_case_insensitive(&config, "windows-build-package"),
-        "CircleCI config must define windows build/package job"
+        !contains_case_insensitive(&config, "windows-build-package"),
+        "CircleCI config must not define windows build/package jobs when windows is unsupported"
     );
     assert!(
         contains_case_insensitive(&config, "cargo test --locked"),
@@ -102,8 +97,8 @@ fn circleci_cross_platform_workflow_exists_and_has_required_jobs() {
         "CircleCI workflow must package artifacts on unix targets"
     );
     assert!(
-        contains_case_insensitive(&config, "scripts\\release\\package-artifacts.ps1"),
-        "CircleCI workflow must package artifacts on windows targets"
+        !contains_case_insensitive(&config, "scripts\\release\\package-artifacts.ps1"),
+        "CircleCI workflow must not package artifacts on windows targets when windows is unsupported"
     );
     assert!(
         contains_case_insensitive(&config, "ignore: main"),
@@ -125,7 +120,6 @@ fn github_actions_cross_platform_workflow_is_not_used() {
 fn packaging_scripts_generate_sha256_checksums() {
     let root = repo_root();
     let shell_script = read_text(&root.join("scripts/release/package-artifacts.sh"));
-    let ps_script = read_text(&root.join("scripts/release/package-artifacts.ps1"));
 
     assert!(
         contains_case_insensitive(&shell_script, ".sha256"),
@@ -135,14 +129,6 @@ fn packaging_scripts_generate_sha256_checksums() {
         contains_case_insensitive(&shell_script, "sha256sum")
             || contains_case_insensitive(&shell_script, "shasum -a 256"),
         "unix packaging script must compute SHA256 digests"
-    );
-    assert!(
-        contains_case_insensitive(&ps_script, ".sha256"),
-        "windows packaging script must emit sha256 files"
-    );
-    assert!(
-        contains_case_insensitive(&ps_script, "Get-FileHash -Algorithm SHA256"),
-        "windows packaging script must compute SHA256 digests"
     );
 }
 

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Define a repeatable build and release path for Linux, macOS, and Windows so the daemon can be distributed with the same safety model on every supported platform.
+Define a repeatable build and release path for Linux and macOS so the daemon can be distributed with the same safety model on every supported platform.
 
 This feature makes the CircleCI build matrix, packaging rules, artifact integrity checks, and release gate explicit before any binary is published.
 
@@ -10,7 +10,6 @@ This feature makes the CircleCI build matrix, packaging rules, artifact integrit
 
 - Linux builds produce the primary server binary and any release-side helpers required for packaging.
 - macOS builds verify the daemon compiles and packages cleanly on Apple hosts.
-- Windows builds verify the daemon compiles and packages cleanly on Windows hosts.
 - The `.circleci/config.yml` workflow `cross-platform-build-distribution` defines these targets as required jobs.
 - Each target in the matrix must be treated as required unless the release scope explicitly narrows the supported platforms.
 - The matrix is complete only when every declared OS target has a successful build result and a recorded smoke test result.
@@ -19,7 +18,6 @@ This feature makes the CircleCI build matrix, packaging rules, artifact integrit
 
 - Build outputs must be packaged per platform so the release artifact is easy to install and verify.
 - Linux and macOS artifacts should be packaged in archive form with stable filenames.
-- Windows artifacts should be packaged in a platform-appropriate archive format.
 - Packaging must keep the release payload minimal and deterministic.
 - Artifact upload must happen only after the packaged bytes and checksum manifest are ready.
 - CircleCI stores packaged artifacts per platform job so each target’s output is auditable independently.
@@ -56,7 +54,7 @@ This feature makes the CircleCI build matrix, packaging rules, artifact integrit
 
 ## Expected Release Artifacts
 
-- Platform build summary covering Linux, macOS, and Windows
+- Platform build summary covering Linux and macOS
 - Packaged release archives for each supported target
 - Artifact upload summary showing where each packaged binary was published
 - Checksum manifest for all packaged artifacts
