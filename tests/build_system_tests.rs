@@ -121,6 +121,10 @@ fn circleci_cross_platform_workflow_exists_and_has_required_jobs() {
         "CircleCI linux workflow must avoid grep -q pipelines that trigger SIGPIPE under pipefail"
     );
     assert!(
+        !contains_case_insensitive(&config, "<<<"),
+        "CircleCI config must not use bash here-strings because CircleCI v2.1 treats '<<' as template tags"
+    );
+    assert!(
         contains_case_insensitive(&config, "ignore: main"),
         "cross-platform workflow should avoid direct main-branch push pipelines"
     );
