@@ -236,3 +236,30 @@ fn build_docs_exist_and_cover_required_release_steps() {
         flowchart_build.display()
     );
 }
+
+#[test]
+fn build_and_test_guide_exists_is_indexed_and_has_core_commands() {
+    let root = repo_root();
+    let guide_path = root.join("docs/build-and-test.md");
+    let docs_readme = read_text(&root.join("docs/README.md"));
+
+    assert!(guide_path.exists(), "expected docs/build-and-test.md");
+    assert!(
+        contains_case_insensitive(&docs_readme, "build-and-test.md"),
+        "docs/README.md must list docs/build-and-test.md"
+    );
+
+    let guide = read_text(&guide_path);
+    assert!(
+        contains_case_insensitive(&guide, "cargo build --release --locked"),
+        "build-and-test guide must include a locked release build command"
+    );
+    assert!(
+        contains_case_insensitive(&guide, "cargo test --locked"),
+        "build-and-test guide must include locked test execution"
+    );
+    assert!(
+        contains_case_insensitive(&guide, "smoke test"),
+        "build-and-test guide must include a smoke-test step"
+    );
+}
