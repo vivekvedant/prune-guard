@@ -23,6 +23,7 @@ This feature makes the CircleCI build matrix, packaging rules, artifact integrit
   - `/etc/prune-guard/prune-guard.toml` config template
   - `/lib/systemd/system/prune-guard.service` oneshot service unit
   - `/lib/systemd/system/prune-guard.timer` recurring timer unit
+- Linux `.deb` packaging must exclude the recursive `target/release` build tree to keep artifacts small, deterministic, and resilient in CI.
 - macOS artifacts remain packaged as archive files with stable filenames.
 - Packaging must keep the release payload minimal and deterministic.
 - Artifact upload must happen only after the packaged bytes and checksum manifest are ready.

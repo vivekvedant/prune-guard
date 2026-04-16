@@ -163,10 +163,46 @@ jobs:
             fi
 
             dpkg-deb --info "$archive_path" >/dev/null
-            dpkg-deb --contents "$archive_path" | grep -q "/etc/prune-guard/prune-guard.toml"
-            dpkg-deb --contents "$archive_path" | grep -q "/usr/bin/prune-guard"
-            dpkg-deb --contents "$archive_path" | grep -q "/lib/systemd/system/prune-guard.service"
-            dpkg-deb --contents "$archive_path" | grep -q "/lib/systemd/system/prune-guard.timer"
+            contents="$(dpkg-deb --contents "$archive_path")"
+            case "$contents" in
+              *"/etc/prune-guard/prune-guard.toml"*) ;;
+              *)
+                echo "Linux .deb is missing /etc/prune-guard/prune-guard.toml."
+                exit 1
+                ;;
+            esac
+
+            case "$contents" in
+              *"/usr/bin/prune-guard"*) ;;
+              *)
+                echo "Linux .deb is missing /usr/bin/prune-guard."
+                exit 1
+                ;;
+            esac
+
+            case "$contents" in
+              *"/lib/systemd/system/prune-guard.service"*) ;;
+              *)
+                echo "Linux .deb is missing /lib/systemd/system/prune-guard.service."
+                exit 1
+                ;;
+            esac
+
+            case "$contents" in
+              *"/lib/systemd/system/prune-guard.timer"*) ;;
+              *)
+                echo "Linux .deb is missing /lib/systemd/system/prune-guard.timer."
+                exit 1
+                ;;
+            esac
+
+            case "$contents" in
+              *"/usr/lib/prune-guard/release"*)
+                echo "Linux .deb must not include the recursive target/release build tree."
+                exit 1
+                ;;
+              *) ;;
+            esac
 
       - store_artifacts:
           path: dist

@@ -113,6 +113,18 @@ fn circleci_cross_platform_workflow_exists_and_has_required_jobs() {
         "CircleCI linux workflow must verify systemd timer path inside .deb"
     );
     assert!(
+        contains_case_insensitive(&config, "/usr/lib/prune-guard/release"),
+        "CircleCI linux workflow must fail when recursive target/release payload is present in .deb"
+    );
+    assert!(
+        !contains_case_insensitive(&config, "dpkg-deb --contents \"$archive_path\" | grep -q"),
+        "CircleCI linux workflow must avoid grep -q pipelines that trigger SIGPIPE under pipefail"
+    );
+    assert!(
+        !contains_case_insensitive(&config, "<<<"),
+        "CircleCI config must not use bash here-strings because CircleCI v2.1 treats '<<' as template tags"
+    );
+    assert!(
         contains_case_insensitive(&config, "ignore: main"),
         "cross-platform workflow should avoid direct main-branch push pipelines"
     );
@@ -166,6 +178,21 @@ fn packaging_scripts_generate_sha256_checksums() {
     assert!(
         contains_case_insensitive(&deb_script, "enable prune-guard.timer"),
         "linux deb packaging script must enable timer-based scheduling"
+    );
+}
+
+#[test]
+fn deb_packaging_script_keeps_payload_minimal_and_deterministic() {
+    let root = repo_root();
+    let deb_script = read_text(&root.join("scripts/release/package-artifacts-deb.sh"));
+
+    assert!(
+        !contains_case_insensitive(&deb_script, "/usr/lib/prune-guard/release"),
+        "linux deb packaging script must not include the full target/release tree"
+    );
+    assert!(
+        !contains_case_insensitive(&deb_script, "cp -R \"${release_dir}/.\""),
+        "linux deb packaging script must not recursively copy the entire release directory"
     );
 }
 
