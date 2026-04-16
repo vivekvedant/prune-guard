@@ -18,6 +18,10 @@ This feature makes the CircleCI build matrix, packaging rules, artifact integrit
 
 - Build outputs must be packaged per platform so the release artifact is easy to install and verify.
 - Linux artifacts are packaged as `.deb` packages with stable filenames.
+- Linux `.deb` package includes:
+  - `/usr/bin/prune-guard` daemon executable
+  - `/etc/prune-guard/prune-guard.toml` config template
+  - `/lib/systemd/system/prune-guard.service` service unit
 - macOS artifacts remain packaged as archive files with stable filenames.
 - Packaging must keep the release payload minimal and deterministic.
 - Artifact upload must happen only after the packaged bytes and checksum manifest are ready.
@@ -56,7 +60,8 @@ This feature makes the CircleCI build matrix, packaging rules, artifact integrit
 ## Expected Release Artifacts
 
 - Platform build summary covering Linux and macOS
-- Packaged release archives for each supported target
+- Linux `.deb` package and checksum
+- Packaged release archive for macOS target
 - Artifact upload summary showing where each packaged binary was published
 - Checksum manifest for all packaged artifacts
 - Smoke test results for each matrix entry

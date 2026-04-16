@@ -19,7 +19,7 @@ This folder contains feature-oriented documentation beyond top-level requirement
 - `reliability-and-error-handling.md`: retry/backoff, partial-failure continuation, locking, and fail-closed reliability behavior
 - `observability-security-portability.md`: structured logs, redaction, metrics hooks, least-privilege checks, and OS validation
 - `release-readiness.md`: documentation alignment, release readiness rules, dry-run default, and fail-closed release guidance
-- `cross-platform-build-distribution.md`: Linux/macOS build matrix, Linux `.deb` packaging, checksums, and fail-closed release gating
+- `cross-platform-build-distribution.md`: Linux/macOS build matrix, Linux `.deb` packaging with daemon+systemd install payload, checksums, and fail-closed release gating
 - `build-and-test.md`: local build, test, and smoke test instructions for day-to-day development
 - `release-runbook.md`: Release operator runbook for merge readiness, documentation checks, and abort conditions
 - `pr-checklist.md`: Reviewer-facing PR checklist for safety-critical release readiness

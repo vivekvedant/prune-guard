@@ -17,8 +17,10 @@ It does not perform real cleanup against Docker/Podman yet. It defines the share
 ## Module Map
 
 - `src/lib.rs`: crate entrypoint and public exports
+- `src/main.rs`: daemon entrypoint (config loading, backend selection, scheduler loop)
 - `src/config.rs`: `Config` model, TOML subset parser, validation rules
 - `config/prune-guard.toml`: install template config (deploy to `/etc/prune-guard/prune-guard.toml`)
+- `packaging/systemd/prune-guard.service`: systemd unit for installed daemon execution
 - `src/domain.rs`: runtime-safe domain structs/enums
 - `src/backend.rs`: backend pipeline contracts
 - `src/error.rs`: shared error enum for all stages

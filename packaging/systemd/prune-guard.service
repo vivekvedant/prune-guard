@@ -1,0 +1,15 @@
+[Unit]
+Description=Prune Guard Cleanup Daemon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/prune-guard --config /etc/prune-guard/prune-guard.toml
+Restart=on-failure
+RestartSec=15s
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

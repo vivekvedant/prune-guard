@@ -19,10 +19,11 @@ flowchart TD
 flowchart TD
     A[Package artifacts] --> B[Generate checksums for every artifact]
     B --> C[Artifact upload for packaged binaries and checksum manifest]
-    C --> D[Verify Linux .deb structure and run platform smoke tests]
-    D --> E{Did every smoke test pass?}
-    E -- No --> F[Block release publication]
-    E -- Yes --> G[Mark build set releasable]
+    C --> D[Verify Linux .deb includes binary config and systemd service]
+    D --> E[Run platform smoke tests]
+    E --> F{Did every smoke test pass?}
+    F -- No --> G[Block release publication]
+    F -- Yes --> H[Mark build set releasable]
 ```
 
 ## Release Gate Flow

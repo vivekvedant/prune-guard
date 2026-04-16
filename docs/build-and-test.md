@@ -24,10 +24,10 @@ cargo build --locked
 cargo build --release --locked
 ```
 
-This crate currently builds as a library target. Release artifact path:
+Release binary path:
 
 ```text
-target/release/libprune_guard.rlib
+target/release/prune-guard
 ```
 
 ## Test
@@ -46,16 +46,16 @@ cargo test --test docker_backend_tests --locked
 
 ## Smoke Test
 
-After a release build, run a smoke test that exercises parsing and runtime behavior through tests:
+After a release build, run a smoke test to confirm the daemon binary starts and argument parsing works:
 
 ```bash
-cargo test --test config_tests --locked
+./target/release/prune-guard --help
 ```
 
-Optional backend-focused smoke test:
+Optional one-shot dry-run smoke test using the install config template:
 
 ```bash
-cargo test --test docker_backend_tests --locked
+./target/release/prune-guard --config config/prune-guard.toml --once
 ```
 
 ## Safety Notes
