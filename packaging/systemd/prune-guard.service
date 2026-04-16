@@ -4,12 +4,7 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-Type=simple
-ExecStart=/usr/bin/prune-guard --config /etc/prune-guard/prune-guard.toml
-Restart=on-failure
-RestartSec=15s
+Type=oneshot
+ExecStart=/usr/bin/prune-guard --config /etc/prune-guard/prune-guard.toml --once
 StandardOutput=journal
 StandardError=journal
-
-[Install]
-WantedBy=multi-user.target

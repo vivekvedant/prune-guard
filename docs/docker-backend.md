@@ -40,6 +40,10 @@ The implementation is in `src/docker_backend.rs`.
   - Images used by containers are marked `referenced = true`.
   - Volumes mounted by any container are marked `referenced = true`.
   - Volumes mounted by running containers are marked `in_use = true`.
+- Image discovery has a fail-closed template fallback:
+  - First attempt inspects labels via `.Config.Labels`.
+  - If Docker returns the known template error (`map has no entry for key "Labels"`), discovery retries with a labels-free inspect template.
+  - Fallback candidates are emitted with `metadata_complete = false` / `metadata_ambiguous = true` so policy always skips deletion.
 - Any ambiguous or missing critical metadata is emitted as incomplete/ambiguous, so policy/planner fail closed and skip deletion.
 
 ### Action Execution
@@ -70,6 +74,7 @@ The implementation is in `src/docker_backend.rs`.
   - referenced images
   - attached volumes
   - ambiguous metadata
+  - image inspect fallback when labels are unavailable
 - Execution safety guards:
   - running containers are never deleted
   - referenced images are never deleted

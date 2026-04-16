@@ -78,6 +78,12 @@ if [ ! -s "$service_template" ]; then
   exit 1
 fi
 
+timer_template="${workspace_root}/packaging/systemd/prune-guard.timer"
+if [ ! -s "$timer_template" ]; then
+  echo "Systemd timer template missing: $timer_template" >&2
+  exit 1
+fi
+
 daemon_binary="${release_dir}/prune-guard"
 if [ ! -f "$daemon_binary" ]; then
   echo "Daemon binary missing: $daemon_binary" >&2
@@ -102,26 +108,27 @@ trap 'rm -rf "$staging_root"' EXIT
 
 deb_root="${staging_root}/prune-guard_${version}_${deb_arch}"
 debian_dir="${deb_root}/DEBIAN"
-release_payload_dir="${deb_root}/usr/lib/prune-guard/release"
 config_dir="${deb_root}/etc/prune-guard"
 doc_dir="${deb_root}/usr/share/doc/prune-guard"
 installed_daemon_path="/usr/bin/prune-guard"
 installed_systemd_unit_path="/lib/systemd/system/prune-guard.service"
+installed_systemd_timer_path="/lib/systemd/system/prune-guard.timer"
 daemon_target="${deb_root}${installed_daemon_path}"
 systemd_unit_target="${deb_root}${installed_systemd_unit_path}"
+systemd_timer_target="${deb_root}${installed_systemd_timer_path}"
 
 mkdir -p \
   "$debian_dir" \
-  "$release_payload_dir" \
   "$(dirname "$daemon_target")" \
   "$config_dir" \
   "$doc_dir" \
-  "$(dirname "$systemd_unit_target")"
+  "$(dirname "$systemd_unit_target")" \
+  "$(dirname "$systemd_timer_target")"
 
-cp -R "${release_dir}/." "$release_payload_dir/"
 cp "$daemon_binary" "$daemon_target"
 cp "$config_template" "${config_dir}/prune-guard.toml"
 cp "$service_template" "$systemd_unit_target"
+cp "$timer_template" "$systemd_timer_target"
 cp "${workspace_root}/README.md" "${doc_dir}/README.md"
 cp "${workspace_root}/Cargo.toml" "${doc_dir}/Cargo.toml"
 cp "${workspace_root}/Cargo.lock" "${doc_dir}/Cargo.lock"
@@ -134,7 +141,7 @@ Priority: optional
 Architecture: ${deb_arch}
 Maintainer: Prune Guard Maintainers <noreply@example.com>
 Description: Safety-first cleanup daemon release payload and config template
- This package ships prune-guard release artifacts and a fail-closed default
+ This package ships the prune-guard daemon binary and a fail-closed default
  configuration template for Linux installs.
 EOF
 
@@ -148,8 +155,9 @@ cat > "${debian_dir}/postinst" <<'EOF'
 set -e
 if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
   systemctl daemon-reload || true
-  systemctl enable prune-guard.service || true
-  systemctl restart prune-guard.service || true
+  systemctl disable prune-guard.service || true
+  systemctl enable prune-guard.timer || true
+  systemctl start prune-guard.timer || true
 fi
 exit 0
 EOF
@@ -158,8 +166,9 @@ cat > "${debian_dir}/prerm" <<'EOF'
 #!/bin/sh
 set -e
 if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
+  systemctl stop prune-guard.timer || true
+  systemctl disable prune-guard.timer || true
   systemctl stop prune-guard.service || true
-  systemctl disable prune-guard.service || true
   systemctl daemon-reload || true
 fi
 exit 0

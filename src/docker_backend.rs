@@ -12,6 +12,8 @@ const CONTAINER_INSPECT_TEMPLATE: &str =
     "{{.Id}}\t{{.Name}}\t{{.State.Running}}\t{{.Created}}\t{{.Image}}\t{{.SizeRw}}\t{{range $k,$v := .Config.Labels}}{{$k}}={{$v}};{{end}}\t{{range .Mounts}}{{.Name}};{{end}}";
 const IMAGE_INSPECT_TEMPLATE: &str =
     "{{.Id}}\t{{range .RepoTags}}{{.}};{{end}}\t{{.Created}}\t{{.Size}}\t{{range $k,$v := .Config.Labels}}{{$k}}={{$v}};{{end}}";
+const IMAGE_INSPECT_TEMPLATE_NO_LABELS: &str =
+    "{{.Id}}\t{{range .RepoTags}}{{.}};{{end}}\t{{.Created}}\t{{.Size}}\t";
 const VOLUME_INSPECT_TEMPLATE: &str =
     "{{.Name}}\t{{.CreatedAt}}\t{{range $k,$v := .Labels}}{{$k}}={{$v}};{{end}}";
 
@@ -318,12 +320,42 @@ impl<R: CommandRunner> CandidateDiscoverer for DockerBackend<R> {
         for image_id in non_empty_lines(&image_ids) {
             let inspect = self
                 .run_docker(&["image", "inspect", "--format", IMAGE_INSPECT_TEMPLATE, image_id])
-                .map_err(|message| CleanupError::CandidateDiscoveryFailed {
-                    backend: BackendKind::Docker,
-                    message: format!("failed to inspect image `{image_id}`: {message}"),
+                .map(|output| (output, true))
+                .or_else(|message| {
+                    if is_missing_image_labels_error(&message) {
+                        // Fail closed: if labels cannot be inspected due template shape
+                        // differences, continue discovery but mark the image metadata
+                        // incomplete so policy skips deletion.
+                        self.run_docker(&[
+                            "image",
+                            "inspect",
+                            "--format",
+                            IMAGE_INSPECT_TEMPLATE_NO_LABELS,
+                            image_id,
+                        ])
+                        .map(|output| (output, false))
+                        .map_err(|fallback_message| {
+                            CleanupError::CandidateDiscoveryFailed {
+                                backend: BackendKind::Docker,
+                                message: format!(
+                                    "failed to inspect image `{image_id}` after labels-template fallback: primary_error={message}; fallback_error={fallback_message}"
+                                ),
+                            }
+                        })
+                    } else {
+                        Err(CleanupError::CandidateDiscoveryFailed {
+                            backend: BackendKind::Docker,
+                            message: format!("failed to inspect image `{image_id}`: {message}"),
+                        })
+                    }
                 })?;
 
-            candidates.push(parse_image_candidate(&inspect, now, &referenced_image_ids));
+            candidates.push(parse_image_candidate(
+                &inspect.0,
+                now,
+                &referenced_image_ids,
+                inspect.1,
+            ));
         }
 
         let volume_names = self
@@ -500,6 +532,7 @@ fn parse_image_candidate(
     inspect_output: &str,
     now: SystemTime,
     referenced_image_ids: &HashSet<String>,
+    labels_known: bool,
 ) -> CandidateArtifact {
     let line = first_non_empty_line(inspect_output).unwrap_or_default();
     let fields: Vec<&str> = line.split('\t').collect();
@@ -529,7 +562,8 @@ fn parse_image_candidate(
     } else {
         Some(referenced_image_ids.contains(&normalize_image_id(&identifier)))
     };
-    let metadata_complete = !identifier.is_empty() && age_days.is_some() && size_bytes.is_some();
+    let metadata_complete =
+        !identifier.is_empty() && age_days.is_some() && size_bytes.is_some() && labels_known;
 
     CandidateArtifact {
         backend: BackendKind::Docker,
@@ -546,6 +580,12 @@ fn parse_image_candidate(
         metadata_ambiguous: !metadata_complete,
         discovered_at: Some(now),
     }
+}
+
+fn is_missing_image_labels_error(message: &str) -> bool {
+    message.contains("template parsing error")
+        && message.contains(".Config.Labels")
+        && message.contains("map has no entry for key \"Labels\"")
 }
 
 fn parse_volume_candidate(

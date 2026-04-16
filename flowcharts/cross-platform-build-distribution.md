@@ -19,7 +19,7 @@ flowchart TD
 flowchart TD
     A[Package artifacts] --> B[Generate checksums for every artifact]
     B --> C[Artifact upload for packaged binaries and checksum manifest]
-    C --> D[Verify Linux .deb includes binary config and systemd service]
+    C --> D[Verify Linux .deb includes binary config oneshot service and timer]
     D --> E[Run platform smoke tests]
     E --> F{Did every smoke test pass?}
     F -- No --> G[Block release publication]
@@ -42,5 +42,6 @@ flowchart TD
 
 - Dry-run is the default path until every supported platform has passed build, packaging, checksum, upload, and smoke test steps.
 - Any missing target or missing checksum blocks publication.
+- Linux `.deb` packaging must include only install-time payload files and must not embed the full `target/release` build tree.
 - Any ambiguity in artifact integrity or smoke-test status must be treated as a release stop, not a warning.
 - Fail-closed release gating is required so partial platform coverage cannot be mistaken for a complete distribution.
