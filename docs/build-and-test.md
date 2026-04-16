@@ -18,16 +18,16 @@ This guide covers the minimal steps to build and validate `prune-guard` locally.
 cargo build --locked
 ```
 
-2. Build the release binary used for packaging/runtime validation:
+2. Build optimized release artifacts:
 
 ```bash
 cargo build --release --locked
 ```
 
-Release binary path:
+This crate currently builds as a library target. Release artifact path:
 
 ```text
-target/release/prune-guard
+target/release/libprune_guard.rlib
 ```
 
 ## Test
@@ -46,16 +46,16 @@ cargo test --test docker_backend_tests --locked
 
 ## Smoke Test
 
-After a release build, run a smoke test to confirm the binary starts and arguments parse:
+After a release build, run a smoke test that exercises parsing and runtime behavior through tests:
 
 ```bash
-./target/release/prune-guard --help
+cargo test --test config_tests --locked
 ```
 
-Optional one-shot dry-run smoke test with the sample config:
+Optional backend-focused smoke test:
 
 ```bash
-./target/release/prune-guard --config config/prune-guard.toml --backend docker --once
+cargo test --test docker_backend_tests --locked
 ```
 
 ## Safety Notes

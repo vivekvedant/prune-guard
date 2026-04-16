@@ -262,4 +262,12 @@ fn build_and_test_guide_exists_is_indexed_and_has_core_commands() {
         contains_case_insensitive(&guide, "smoke test"),
         "build-and-test guide must include a smoke-test step"
     );
+    assert!(
+        contains_case_insensitive(&guide, "libprune_guard.rlib"),
+        "build-and-test guide must describe the release library artifact path"
+    );
+    assert!(
+        !contains_case_insensitive(&guide, "./target/release/prune-guard --help"),
+        "build-and-test guide must not instruct running a non-existent binary in a library-only crate"
+    );
 }
