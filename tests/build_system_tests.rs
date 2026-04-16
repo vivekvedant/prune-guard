@@ -101,6 +101,14 @@ fn circleci_cross_platform_workflow_exists_and_has_required_jobs() {
         "CircleCI linux workflow must verify .deb artifacts explicitly"
     );
     assert!(
+        contains_case_insensitive(&config, "/usr/bin/prune-guard"),
+        "CircleCI linux workflow must verify installed daemon binary path inside .deb"
+    );
+    assert!(
+        contains_case_insensitive(&config, "/lib/systemd/system/prune-guard.service"),
+        "CircleCI linux workflow must verify systemd service path inside .deb"
+    );
+    assert!(
         contains_case_insensitive(&config, "ignore: main"),
         "cross-platform workflow should avoid direct main-branch push pipelines"
     );
@@ -138,6 +146,51 @@ fn packaging_scripts_generate_sha256_checksums() {
     assert!(
         contains_case_insensitive(&deb_script, "dpkg-deb --build"),
         "linux deb packaging script must build a .deb package"
+    );
+    assert!(
+        contains_case_insensitive(&deb_script, "/usr/bin/prune-guard"),
+        "linux deb packaging script must install daemon binary into /usr/bin"
+    );
+    assert!(
+        contains_case_insensitive(&deb_script, "/lib/systemd/system/prune-guard.service"),
+        "linux deb packaging script must install a systemd service unit"
+    );
+}
+
+#[test]
+fn systemd_unit_exists_and_points_to_installed_binary_and_config() {
+    let root = repo_root();
+    let unit_path = root.join("packaging/systemd/prune-guard.service");
+    assert!(
+        unit_path.exists(),
+        "expected packaging/systemd/prune-guard.service"
+    );
+
+    let unit_content = read_text(&unit_path);
+    assert!(
+        contains_case_insensitive(&unit_content, "execstart=/usr/bin/prune-guard"),
+        "systemd unit must run the installed prune-guard binary"
+    );
+    assert!(
+        contains_case_insensitive(&unit_content, "/etc/prune-guard/prune-guard.toml"),
+        "systemd unit must reference installed config path"
+    );
+}
+
+#[test]
+fn daemon_binary_source_exists_and_uses_install_config_default() {
+    let root = repo_root();
+    let main_rs_path = root.join("src/main.rs");
+    assert!(main_rs_path.exists(), "expected src/main.rs daemon entrypoint");
+
+    let main_rs = read_text(&main_rs_path);
+    assert!(
+        contains_case_insensitive(&main_rs, "/etc/prune-guard/prune-guard.toml"),
+        "daemon binary must default to installed config path"
+    );
+    assert!(
+        contains_case_insensitive(&main_rs, "--once"),
+        "daemon binary should provide one-shot mode for safe local validation"
     );
 }
 
@@ -238,7 +291,7 @@ fn build_docs_exist_and_cover_required_release_steps() {
 }
 
 #[test]
-fn build_and_test_guide_exists_is_indexed_and_has_core_commands() {
+fn build_and_test_guide_exists_is_indexed_and_has_binary_smoke_steps() {
     let root = repo_root();
     let guide_path = root.join("docs/build-and-test.md");
     let docs_readme = read_text(&root.join("docs/README.md"));
@@ -259,15 +312,7 @@ fn build_and_test_guide_exists_is_indexed_and_has_core_commands() {
         "build-and-test guide must include locked test execution"
     );
     assert!(
-        contains_case_insensitive(&guide, "smoke test"),
-        "build-and-test guide must include a smoke-test step"
-    );
-    assert!(
-        contains_case_insensitive(&guide, "libprune_guard.rlib"),
-        "build-and-test guide must describe the release library artifact path"
-    );
-    assert!(
-        !contains_case_insensitive(&guide, "./target/release/prune-guard --help"),
-        "build-and-test guide must not instruct running a non-existent binary in a library-only crate"
+        contains_case_insensitive(&guide, "./target/release/prune-guard --help"),
+        "build-and-test guide must include binary smoke-test help command"
     );
 }
