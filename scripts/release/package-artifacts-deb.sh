@@ -108,7 +108,6 @@ trap 'rm -rf "$staging_root"' EXIT
 
 deb_root="${staging_root}/prune-guard_${version}_${deb_arch}"
 debian_dir="${deb_root}/DEBIAN"
-release_payload_dir="${deb_root}/usr/lib/prune-guard/release"
 config_dir="${deb_root}/etc/prune-guard"
 doc_dir="${deb_root}/usr/share/doc/prune-guard"
 installed_daemon_path="/usr/bin/prune-guard"
@@ -120,14 +119,12 @@ systemd_timer_target="${deb_root}${installed_systemd_timer_path}"
 
 mkdir -p \
   "$debian_dir" \
-  "$release_payload_dir" \
   "$(dirname "$daemon_target")" \
   "$config_dir" \
   "$doc_dir" \
   "$(dirname "$systemd_unit_target")" \
   "$(dirname "$systemd_timer_target")"
 
-cp -R "${release_dir}/." "$release_payload_dir/"
 cp "$daemon_binary" "$daemon_target"
 cp "$config_template" "${config_dir}/prune-guard.toml"
 cp "$service_template" "$systemd_unit_target"
@@ -144,7 +141,7 @@ Priority: optional
 Architecture: ${deb_arch}
 Maintainer: Prune Guard Maintainers <noreply@example.com>
 Description: Safety-first cleanup daemon release payload and config template
- This package ships prune-guard release artifacts and a fail-closed default
+ This package ships the prune-guard daemon binary and a fail-closed default
  configuration template for Linux installs.
 EOF
 
