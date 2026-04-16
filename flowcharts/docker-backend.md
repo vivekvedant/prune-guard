@@ -6,12 +6,18 @@ This document captures Docker adapter control flow and safety guards.
 
 ```mermaid
 flowchart TD
-    A[Collect Docker containers/images/volumes] --> B[Build candidate metadata]
-    B --> C{Metadata complete and unambiguous?}
-    C -- No --> D[Mark metadata_ambiguous / metadata_complete=false]
-    C -- Yes --> E[Mark candidate with in_use and referenced flags]
-    D --> F[Policy layer skips candidate fail-closed]
-    E --> G[Planner may create delete action]
+    A[Collect Docker containers/images/volumes] --> B[Inspect image with labels template]
+    B --> C{Labels inspect hit known missing-labels template error?}
+    C -- Yes --> D[Retry image inspect with labels-free template]
+    C -- No --> E[Use primary inspect output]
+    D --> F[Mark labels unknown -> metadata_complete=false]
+    E --> G[Build candidate metadata]
+    F --> G
+    G --> H{Metadata complete and unambiguous?}
+    H -- No --> I[Mark metadata_ambiguous / metadata_complete=false]
+    H -- Yes --> J[Mark candidate with in_use and referenced flags]
+    I --> K[Policy layer skips candidate fail-closed]
+    J --> L[Planner may create delete action]
 ```
 
 ## Execution Safety Re-Validation
