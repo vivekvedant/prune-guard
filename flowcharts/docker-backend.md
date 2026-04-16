@@ -10,9 +10,15 @@ flowchart TD
     B --> C{Labels inspect hit known missing-labels template error?}
     C -- Yes --> D[Retry image inspect with labels-free template]
     C -- No --> E[Use primary inspect output]
-    D --> F[Mark labels unknown -> metadata_complete=false]
+    D --> F{allow_missing_image_labels enabled?}
+    F -- No --> F1[Mark labels unknown -> metadata_complete=false]
+    F -- Yes --> F2[Inspect json labels and require exact `null`]
+    F2 --> F3{labels json exactly null?}
+    F3 -- No --> F1
+    F3 -- Yes --> F4[Treat labels as safe empty set]
     E --> G[Build candidate metadata]
-    F --> G
+    F1 --> G
+    F4 --> G
     G --> H{Metadata complete and unambiguous?}
     H -- No --> I[Mark metadata_ambiguous / metadata_complete=false]
     H -- Yes --> J[Mark candidate with in_use and referenced flags]

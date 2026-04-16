@@ -14,6 +14,10 @@ fn default_config_is_safety_first() {
     assert_eq!(cfg.target_watermark_percent, 70);
     assert_eq!(cfg.min_unused_age_days, 30);
     assert_eq!(cfg.max_delete_per_run_gb, 10);
+    assert!(
+        !cfg.allow_missing_image_labels,
+        "allow_missing_image_labels must default to false"
+    );
     assert_eq!(cfg.enabled_backends, vec!["docker".to_string()]);
     assert!(cfg.protected_images.is_empty());
     assert!(cfg.protected_volumes.is_empty());
@@ -29,6 +33,7 @@ fn parse_str_applies_explicit_overrides() {
             target_watermark_percent = 65
             min_unused_age_days = 14
             max_delete_per_run_gb = 4
+            allow_missing_image_labels = true
             dry_run = false
             enabled_backends = ["docker", "podman"]
             protected_images = ["alpine:latest", "busybox:latest"]
@@ -43,6 +48,7 @@ fn parse_str_applies_explicit_overrides() {
     assert_eq!(cfg.target_watermark_percent, 65);
     assert_eq!(cfg.min_unused_age_days, 14);
     assert_eq!(cfg.max_delete_per_run_gb, 4);
+    assert!(cfg.allow_missing_image_labels);
     assert!(!cfg.dry_run);
     assert_eq!(cfg.enabled_backends, vec!["docker", "podman"]);
     assert_eq!(
@@ -66,6 +72,7 @@ fn from_reader_supports_sectioned_toml() {
 
             [safety]
             dry_run = false
+            allow_missing_image_labels = true
             protected_images = ["postgres:16"]
         "#,
     ))
@@ -75,6 +82,7 @@ fn from_reader_supports_sectioned_toml() {
     assert_eq!(cfg.high_watermark_percent, 90);
     assert_eq!(cfg.target_watermark_percent, 75);
     assert!(!cfg.dry_run);
+    assert!(cfg.allow_missing_image_labels);
     assert_eq!(cfg.protected_images, vec!["postgres:16"]);
 }
 

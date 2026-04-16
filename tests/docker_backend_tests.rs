@@ -210,6 +210,89 @@ fn discovery_degrades_when_image_labels_are_unavailable() {
 }
 
 #[test]
+fn discovery_allows_missing_image_labels_when_opted_in_and_labels_are_null() {
+    let runner = FakeRunner::new(vec![
+        ok("docker|ps|-a|-q|--no-trunc", ""),
+        ok(
+            "docker|image|ls|-q|--no-trunc",
+            "sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11\n",
+        ),
+        err(
+            "docker|image|inspect|--format|{{.Id}}\t{{range .RepoTags}}{{.}};{{end}}\t{{.Created}}\t{{.Size}}\t{{range $k,$v := .Config.Labels}}{{$k}}={{$v}};{{end}}|sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11",
+            "`docker` exited with code Some(1): template parsing error: template: :1:88: executing \"\" at <.Config.Labels>: map has no entry for key \"Labels\"",
+        ),
+        ok(
+            "docker|image|inspect|--format|{{.Id}}\t{{range .RepoTags}}{{.}};{{end}}\t{{.Created}}\t{{.Size}}\t|sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11",
+            "sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11\trepo/no-labels:latest;\t2024-01-01T00:00:00Z\t2048\t\n",
+        ),
+        ok(
+            "docker|image|inspect|--format|{{json .Config.Labels}}|sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11",
+            "null\n",
+        ),
+        ok("docker|volume|ls|-q", ""),
+    ]);
+    let backend = DockerBackend::with_runner(runner);
+
+    let response = backend
+        .discover_candidates(discovery_request_allow_missing_labels())
+        .expect("opt-in should allow null labels to be treated as empty labels");
+
+    let image = response
+        .candidates
+        .iter()
+        .find(|candidate| {
+            candidate.identifier
+                == "sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11"
+        })
+        .expect("image candidate should exist");
+
+    assert!(image.metadata_complete);
+    assert!(!image.metadata_ambiguous);
+    assert!(image.labels.is_empty());
+}
+
+#[test]
+fn discovery_keeps_missing_image_labels_fail_closed_when_opted_in_but_not_null() {
+    let runner = FakeRunner::new(vec![
+        ok("docker|ps|-a|-q|--no-trunc", ""),
+        ok(
+            "docker|image|ls|-q|--no-trunc",
+            "sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11\n",
+        ),
+        err(
+            "docker|image|inspect|--format|{{.Id}}\t{{range .RepoTags}}{{.}};{{end}}\t{{.Created}}\t{{.Size}}\t{{range $k,$v := .Config.Labels}}{{$k}}={{$v}};{{end}}|sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11",
+            "`docker` exited with code Some(1): template parsing error: template: :1:88: executing \"\" at <.Config.Labels>: map has no entry for key \"Labels\"",
+        ),
+        ok(
+            "docker|image|inspect|--format|{{.Id}}\t{{range .RepoTags}}{{.}};{{end}}\t{{.Created}}\t{{.Size}}\t|sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11",
+            "sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11\trepo/no-labels:latest;\t2024-01-01T00:00:00Z\t2048\t\n",
+        ),
+        ok(
+            "docker|image|inspect|--format|{{json .Config.Labels}}|sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11",
+            "{}\n",
+        ),
+        ok("docker|volume|ls|-q", ""),
+    ]);
+    let backend = DockerBackend::with_runner(runner);
+
+    let response = backend
+        .discover_candidates(discovery_request_allow_missing_labels())
+        .expect("discovery should continue while preserving fail-closed behavior");
+
+    let image = response
+        .candidates
+        .iter()
+        .find(|candidate| {
+            candidate.identifier
+                == "sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11"
+        })
+        .expect("image candidate should exist");
+
+    assert!(!image.metadata_complete);
+    assert!(image.metadata_ambiguous);
+}
+
+#[test]
 fn execution_blocks_running_container_deletion() {
     let runner = FakeRunner::new(vec![ok(
         "docker|container|inspect|--size|--format|{{.Id}}\t{{.Name}}\t{{.State.Running}}\t{{.Created}}\t{{.Image}}\t{{.SizeRw}}\t{{range $k,$v := .Config.Labels}}{{$k}}={{$v}};{{end}}\t{{range .Mounts}}{{.Name}};{{end}}|ctr-running",
@@ -391,6 +474,7 @@ fn discovery_request() -> CandidateDiscoveryRequest {
             min_unused_age_days: 7,
             max_delete_per_run_gb: 5,
             dry_run: false,
+            allow_missing_image_labels: false,
             protected_images: vec![],
             protected_volumes: vec![],
             protected_labels: vec![],
@@ -402,6 +486,16 @@ fn discovery_request() -> CandidateDiscoveryRequest {
             used_percent: Some(90),
             observed_at: None,
         },
+    }
+}
+
+fn discovery_request_allow_missing_labels() -> CandidateDiscoveryRequest {
+    CandidateDiscoveryRequest {
+        config: CleanupConfig {
+            allow_missing_image_labels: true,
+            ..discovery_request().config
+        },
+        ..discovery_request()
     }
 }
 

@@ -33,6 +33,8 @@ pub struct Config {
     pub max_delete_per_run_gb: u64,
     /// Safety default: simulate only.
     pub dry_run: bool,
+    /// Opt-in compatibility mode for runtimes that omit image labels metadata.
+    pub allow_missing_image_labels: bool,
     /// Enabled backend identifiers (for example: docker, podman).
     pub enabled_backends: Vec<String>,
     /// Explicitly protected images.
@@ -52,6 +54,7 @@ impl Default for Config {
             min_unused_age_days: 30,
             max_delete_per_run_gb: 10,
             dry_run: true,
+            allow_missing_image_labels: false,
             enabled_backends: vec!["docker".to_string()],
             protected_images: Vec::new(),
             protected_volumes: Vec::new(),
@@ -126,6 +129,15 @@ impl Config {
             &["dry_run", "safety.dry_run", "runtime.dry_run"],
             config.dry_run,
             "dry_run",
+        )?;
+        config.allow_missing_image_labels = take_bool(
+            &entries,
+            &[
+                "allow_missing_image_labels",
+                "safety.allow_missing_image_labels",
+            ],
+            config.allow_missing_image_labels,
+            "allow_missing_image_labels",
         )?;
         config.enabled_backends = take_string_array(
             &entries,
@@ -509,6 +521,8 @@ fn is_known_key(key: &str) -> bool {
             "dry_run",
             "safety.dry_run",
             "runtime.dry_run",
+            "allow_missing_image_labels",
+            "safety.allow_missing_image_labels",
             "enabled_backends",
             "backends.enabled_backends",
             "protected_images",

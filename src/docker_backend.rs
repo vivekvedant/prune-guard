@@ -14,6 +14,7 @@ const IMAGE_INSPECT_TEMPLATE: &str =
     "{{.Id}}\t{{range .RepoTags}}{{.}};{{end}}\t{{.Created}}\t{{.Size}}\t{{range $k,$v := .Config.Labels}}{{$k}}={{$v}};{{end}}";
 const IMAGE_INSPECT_TEMPLATE_NO_LABELS: &str =
     "{{.Id}}\t{{range .RepoTags}}{{.}};{{end}}\t{{.Created}}\t{{.Size}}\t";
+const IMAGE_LABELS_JSON_TEMPLATE: &str = "{{json .Config.Labels}}";
 const VOLUME_INSPECT_TEMPLATE: &str =
     "{{.Name}}\t{{.CreatedAt}}\t{{range $k,$v := .Labels}}{{$k}}={{$v}};{{end}}";
 
@@ -201,6 +202,29 @@ impl<R: CommandRunner> DockerBackend<R> {
         }
     }
 
+    fn can_treat_missing_image_labels_as_empty(
+        &self,
+        image_id: &str,
+        allow_missing_image_labels: bool,
+    ) -> bool {
+        if !allow_missing_image_labels {
+            return false;
+        }
+
+        // Safety gate for the opt-in mode:
+        // only accept missing labels when Docker explicitly reports JSON `null`.
+        // Any command error or non-null payload stays fail-closed.
+        let labels_output =
+            match self.run_docker(&["image", "inspect", "--format", IMAGE_LABELS_JSON_TEMPLATE, image_id]) {
+                Ok(output) => output,
+                Err(_) => return false,
+            };
+
+        first_non_empty_line(&labels_output)
+            .map(|line| line.trim() == "null")
+            .unwrap_or(false)
+    }
+
     fn ensure_volume_not_attached(&self, volume_name: &str) -> Result<()> {
         let containers = self.collect_container_metadata_raw().map_err(|message| {
             CleanupError::ExecutionFailed {
@@ -367,7 +391,8 @@ impl<R: CommandRunner> CandidateDiscoverer for DockerBackend<R> {
                     if is_missing_image_labels_error(&message) {
                         // Fail closed: if labels cannot be inspected due template shape
                         // differences, continue discovery but mark the image metadata
-                        // incomplete so policy skips deletion.
+                        // incomplete so policy skips deletion unless explicit null-label
+                        // verification allows safe empty-label treatment.
                         self.run_docker(&[
                             "image",
                             "inspect",
@@ -375,7 +400,13 @@ impl<R: CommandRunner> CandidateDiscoverer for DockerBackend<R> {
                             IMAGE_INSPECT_TEMPLATE_NO_LABELS,
                             image_id,
                         ])
-                        .map(|output| (output, false))
+                        .map(|output| {
+                            let labels_known = self.can_treat_missing_image_labels_as_empty(
+                                image_id,
+                                request.config.allow_missing_image_labels,
+                            );
+                            (output, labels_known)
+                        })
                         .map_err(|fallback_message| {
                             CleanupError::CandidateDiscoveryFailed {
                                 backend: BackendKind::Docker,
