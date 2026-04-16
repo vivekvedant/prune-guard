@@ -137,18 +137,10 @@ impl<R: CommandRunner> DockerBackend<R> {
     }
 
     fn ensure_image_not_referenced(&self, image_id: &str) -> Result<()> {
-        let output =
-            self.run_docker(&["ps", "-a", "--format", "{{.ImageID}}"])
-                .map_err(|message| CleanupError::ExecutionFailed {
-                    backend: BackendKind::Docker,
-                    message: format!("failed to discover image references: {message}"),
-                })?;
+        let referenced_image_ids = self.collect_referenced_image_ids()?;
 
         let normalized_target = normalize_image_id(image_id);
-        let referenced = non_empty_lines(&output)
-            .into_iter()
-            .map(normalize_image_id)
-            .any(|candidate| candidate == normalized_target);
+        let referenced = referenced_image_ids.contains(&normalized_target);
 
         if referenced {
             Err(CleanupError::SafetyViolation {
@@ -156,6 +148,56 @@ impl<R: CommandRunner> DockerBackend<R> {
             })
         } else {
             Ok(())
+        }
+    }
+
+    fn collect_referenced_image_ids(&self) -> Result<HashSet<String>> {
+        match self.run_docker(&["ps", "-a", "--format", "{{.ImageID}}"]) {
+            Ok(output) => Ok(non_empty_lines(&output)
+                .into_iter()
+                .map(normalize_image_id)
+                .collect()),
+            Err(message) => {
+                if !is_unsupported_image_id_template_error(&message) {
+                    return Err(CleanupError::ExecutionFailed {
+                        backend: BackendKind::Docker,
+                        message: format!("failed to discover image references: {message}"),
+                    });
+                }
+
+                // Compatibility fallback for Docker variants that do not expose
+                // `.ImageID` in `docker ps --format`. We inspect each container
+                // directly and fail closed if any image reference is ambiguous.
+                let container_ids =
+                    self.run_docker(&["ps", "-a", "-q", "--no-trunc"])
+                        .map_err(|fallback_message| CleanupError::ExecutionFailed {
+                            backend: BackendKind::Docker,
+                            message: format!(
+                                "failed to discover image references via fallback container listing: {fallback_message}"
+                            ),
+                        })?;
+                let mut referenced_image_ids = HashSet::new();
+                for container_id in non_empty_lines(&container_ids) {
+                    let inspect =
+                        self.run_docker(&["container", "inspect", "--format", "{{.Image}}", container_id])
+                            .map_err(|fallback_message| CleanupError::ExecutionFailed {
+                                backend: BackendKind::Docker,
+                                message: format!(
+                                    "failed to inspect image reference for container `{container_id}`: {fallback_message}"
+                                ),
+                            })?;
+                    let image_reference = first_non_empty_line(&inspect).ok_or_else(|| {
+                        CleanupError::ExecutionFailed {
+                            backend: BackendKind::Docker,
+                            message: format!(
+                                "failed to inspect image reference for container `{container_id}`: empty image reference output"
+                            ),
+                        }
+                    })?;
+                    referenced_image_ids.insert(normalize_image_id(image_reference));
+                }
+                Ok(referenced_image_ids)
+            }
         }
     }
 
@@ -586,6 +628,12 @@ fn is_missing_image_labels_error(message: &str) -> bool {
     message.contains("template parsing error")
         && message.contains(".Config.Labels")
         && message.contains("map has no entry for key \"Labels\"")
+}
+
+fn is_unsupported_image_id_template_error(message: &str) -> bool {
+    message.contains("failed to execute template")
+        && message.contains("<.ImageID>")
+        && message.contains("can't evaluate field ImageID")
 }
 
 fn parse_volume_candidate(

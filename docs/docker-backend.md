@@ -52,6 +52,11 @@ The implementation is in `src/docker_backend.rs`.
 - On real execution, re-validates safety before delete:
   - Container delete is blocked if container is running.
   - Image delete is blocked if image is referenced by any container.
+  - Image reference detection first uses `docker ps -a --format {{.ImageID}}`.
+  - If Docker returns the known template-shape error for `.ImageID`, execution falls back to:
+    - `docker ps -a -q --no-trunc`
+    - `docker container inspect --format {{.Image}} <container-id>`
+  - Fallback inspect output must include an image reference for every container; otherwise execution fails closed.
   - Volume delete is blocked if volume is attached to any container.
 - Safety blocks return `CleanupError::SafetyViolation`.
 - Delete command failures return `CleanupError::ExecutionFailed`.
@@ -78,4 +83,5 @@ The implementation is in `src/docker_backend.rs`.
 - Execution safety guards:
   - running containers are never deleted
   - referenced images are never deleted
+  - referenced images are still blocked when `docker ps` does not support `.ImageID` template field
   - dry-run performs no delete command

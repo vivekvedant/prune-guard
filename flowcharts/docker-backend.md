@@ -45,3 +45,4 @@ Notes:
 
 - Safety checks are re-run immediately before delete to prevent stale-plan unsafe removals.
 - Any uncertainty in safety checks stops execution rather than proceeding optimistically.
+- Image reference check uses `docker ps --format {{.ImageID}}` first; when unsupported, it falls back to container inspect per-id and fails closed on ambiguous output.

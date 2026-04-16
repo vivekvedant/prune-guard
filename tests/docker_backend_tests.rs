@@ -266,6 +266,38 @@ fn execution_blocks_referenced_image_deletion() {
 }
 
 #[test]
+fn execution_blocks_referenced_image_deletion_when_imageid_template_is_unsupported() {
+    let runner = FakeRunner::new(vec![
+        err(
+            "docker|ps|-a|--format|{{.ImageID}}",
+            "`docker` exited with code Some(1): failed to execute template: template: :1:2: executing \"\" at <.ImageID>: can't evaluate field ImageID in type *formatter.ContainerContext",
+        ),
+        ok("docker|ps|-a|-q|--no-trunc", "ctr-a\n"),
+        ok("docker|container|inspect|--format|{{.Image}}|ctr-a", "img-a\n"),
+    ]);
+    let backend = DockerBackend::with_runner(runner.clone());
+
+    let error = backend
+        .execute(execution_request("img-a", ResourceKind::Image, ExecutionMode::RealRun))
+        .expect_err("referenced image must never be deleted even on legacy docker ps formatting");
+
+    match error {
+        CleanupError::SafetyViolation { message } => {
+            assert!(message.contains("referenced image"));
+        }
+        other => panic!("expected safety violation, got {other:?}"),
+    }
+
+    assert!(
+        !runner
+            .calls()
+            .iter()
+            .any(|call| call == "docker|image|rm|img-a"),
+        "delete command must not run for referenced images"
+    );
+}
+
+#[test]
 fn execution_dry_run_returns_without_delete_command() {
     let runner = FakeRunner::new(vec![]);
     let backend = DockerBackend::with_runner(runner.clone());
