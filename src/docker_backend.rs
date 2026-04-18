@@ -141,17 +141,17 @@ impl<R: CommandRunner> DockerBackend<R> {
     }
 
     fn ensure_image_not_referenced(&self, image_id: &str) -> Result<()> {
-        let output =
-            self.run_docker(&["ps", "-a", "--format", "{{.ImageID}}"])
-                .map_err(|message| CleanupError::ExecutionFailed {
-                    backend: BackendKind::Docker,
-                    message: format!("failed to discover image references: {message}"),
-                })?;
+        let containers = self.collect_container_metadata_raw().map_err(|message| {
+            CleanupError::ExecutionFailed {
+                backend: BackendKind::Docker,
+                message: format!("failed to discover image references: {message}"),
+            }
+        })?;
 
         let normalized_target = normalize_image_id(image_id);
-        let referenced = non_empty_lines(&output)
-            .into_iter()
-            .map(normalize_image_id)
+        let referenced = containers
+            .iter()
+            .map(|container| normalize_image_id(&container.image_id))
             .any(|candidate| candidate == normalized_target);
 
         if referenced {

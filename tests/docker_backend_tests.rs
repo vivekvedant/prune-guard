@@ -329,10 +329,13 @@ fn execution_blocks_running_container_deletion() {
 
 #[test]
 fn execution_blocks_referenced_image_deletion() {
-    let runner = FakeRunner::new(vec![ok(
-        "docker|ps|-a|--format|{{.ImageID}}",
-        "img-a\nimg-b\n",
-    )]);
+    let runner = FakeRunner::new(vec![
+        ok("docker|ps|-a|-q|--no-trunc", "ctr-a\n"),
+        ok(
+            "docker|container|inspect|--size|--format|{{.Id}}\t{{.Name}}\t{{.State.Running}}\t{{.Created}}\t{{.Image}}\t{{.SizeRw}}\t{{range $k,$v := .Config.Labels}}{{$k}}={{$v}};{{end}}\t{{range .Mounts}}{{.Name}};{{end}}|ctr-a",
+            "ctr-a\t/app\tfalse\t2026-01-01T00:00:00Z\timg-a\t200\t;\t;\n",
+        ),
+    ]);
     let backend = DockerBackend::with_runner(runner.clone());
 
     let error = backend
