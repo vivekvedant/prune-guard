@@ -65,14 +65,50 @@ The cycle always exits with one explicit stop reason:
 
 `src/main.rs` logs one summary line per tick and includes usage/reclaim fields:
 
+- `tick`
+- `backend`
+- `dry_run`
+- `cleanup_started`
+- `stop_reason`
+- `actions_planned`
+- `actions_completed`
+- `action_failures`
+- `skipped_candidates`
 - `initial_used_bytes`
 - `final_used_bytes`
 - `reclaimed_bytes`
 - `reclaimed_source` (`observed`, `estimated`, `unknown`)
 - `usage_percent_before`
 - `usage_percent_after`
+- `last_error` (emitted as a second log line only when present)
+
+### Output Key Reference
+
+- `tick`: 1-based scheduler tick number within the current process run.
+- `backend`: active backend for the tick (`Docker` or `Podman`).
+- `dry_run`: whether execution mode was dry-run (`true`) or real deletion (`false`).
+- `cleanup_started`: whether usage reached high watermark and cleanup loop started.
+- `stop_reason`: explicit bounded stop condition (`BelowHighWatermark`, `NoActionableCandidates`, `DeletionCapReached`, `ExecutionFailuresDetected`, etc.).
+- `actions_planned`: total delete actions planned across loop iterations in this tick.
+- `actions_completed`: total actions that executed successfully (or safe idempotent no-op for already-missing targets).
+- `action_failures`: total action execution failures; non-zero indicates fail-closed early stop.
+- `skipped_candidates`: candidates skipped by policy/planner safety gates (in use, referenced, protected, ambiguous metadata, delete-cap constraints).
+- `initial_used_bytes`: storage used at tick start (human-readable units, or `unknown` if unavailable).
+- `final_used_bytes`: storage used at tick end (human-readable units, or `unknown` if unavailable).
+- `reclaimed_bytes`: reclaimed storage for the tick.
+- `reclaimed_source`: how `reclaimed_bytes` was derived:
+  - `observed`: computed from `initial_used_bytes - final_used_bytes`
+  - `estimated`: fallback from executed action size estimates when observed delta is unavailable or zero
+  - `unknown`: neither observed nor estimated reclaim is available
+- `usage_percent_before`: usage percent at tick start (`unknown` if unavailable).
+- `usage_percent_after`: usage percent at tick end (`unknown` if unavailable).
+- `last_error`: backend/scheduler error detail string printed as `tick=<n> last_error=<message>` when the tick hit an error path.
+
+### Example
 
 Byte-valued fields are rendered in human-readable units (`B/KB/MB/GB/...`). When usage snapshots are unavailable for a field, output prints `unknown` to preserve fail-closed observability. If observed usage delta is zero but executed actions reported reclaimable sizes, `reclaimed_bytes` falls back to an estimated value and marks `reclaimed_source=estimated`.
+
+`tick=42 backend=Docker dry_run=false cleanup_started=true stop_reason=NoActionableCandidates actions_planned=6 actions_completed=6 action_failures=0 skipped_candidates=24 initial_used_bytes=15.01 GB final_used_bytes=14.44 GB reclaimed_bytes=582.40 MB reclaimed_source=observed usage_percent_before=86 usage_percent_after=82`
 
 ## Tests Added
 
