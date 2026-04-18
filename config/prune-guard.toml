@@ -26,7 +26,9 @@ enabled_backends = ["docker"]
 
 [docker]
 # Optional Docker daemon selection for service environments.
-# Set exactly one of the following when the daemon must target a non-default Docker endpoint.
+# If both values remain unset, prune-guard auto-detects a reachable socket from known local paths.
+# If multiple socket endpoints are reachable, startup fails closed and requires explicit selection.
+# Set exactly one of the following when the daemon must target a specific non-default Docker endpoint.
 # host = "unix:///home/<user>/.docker/desktop/docker.sock"
 # context = "desktop-linux"
 

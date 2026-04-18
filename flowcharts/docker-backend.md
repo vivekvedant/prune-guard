@@ -8,8 +8,14 @@ This document captures Docker adapter control flow and safety guards.
 flowchart TD
     A[Load docker.host / docker.context from config] --> B{Exactly one set?}
     B -- No, both set --> C[Config validation fails closed]
-    B -- Yes or none --> D[Build docker CLI global args]
+    B -- Yes --> D[Build docker CLI global args]
+    B -- None --> F[Probe known local socket endpoints with docker version]
+    F --> G{Exactly one reachable socket host?}
+    G -- Yes --> H[Use detected --host endpoint]
+    G -- No, none reachable --> D
+    G -- No, multiple reachable --> I[Fail closed and require explicit docker.host or docker.context]
     D --> E[Prefix every docker command with --host or --context when configured]
+    H --> E
 ```
 
 ## Discovery Safety Flow
