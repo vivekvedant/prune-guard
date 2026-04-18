@@ -61,6 +61,18 @@ The cycle always exits with one explicit stop reason:
 - Any execution failure stops the cycle immediately to avoid repeated unsafe retries in the same tick.
 - Stop reasons and counters are captured in `SchedulerRunReport` for auditability.
 
+## CLI Tick Output
+
+`src/main.rs` logs one summary line per tick and now includes usage/reclaim fields:
+
+- `initial_used_bytes`
+- `final_used_bytes`
+- `reclaimed_bytes`
+- `usage_percent_before`
+- `usage_percent_after`
+
+When usage snapshots are unavailable for a field, output prints `unknown` to preserve fail-closed observability.
+
 ## Tests Added
 
 `tests/scheduler_tests.rs` covers:
