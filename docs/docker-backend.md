@@ -54,8 +54,10 @@ The implementation is in `src/docker_backend.rs`.
 - Image discovery has a fail-closed template fallback:
   - First attempt inspects labels via `.Config.Labels`.
   - If Docker returns the known template error (`map has no entry for key "Labels"`), discovery retries with a labels-free inspect template.
-  - If `protected_labels` is configured, fallback candidates are emitted with `metadata_complete = false` / `metadata_ambiguous = true` so policy skips deletion fail-closed.
-  - If `protected_labels` is empty, fallback candidates remain actionable because label-based protection is not required for safety checks.
+  - Default behavior is fail-closed: when label-based safety cannot be proven, fallback candidates are emitted with `metadata_complete = false` / `metadata_ambiguous = true` so policy skips deletion.
+  - If `protected_labels` is empty, fallback candidates remain actionable because label-based protection is not required.
+  - Optional compatibility mode: set `allow_missing_image_labels = true` to run a second labels check with `{{json .Config.Labels}}`.
+  - In compatibility mode, labels are treated as safely empty only when that JSON output is exactly `null`; any other output or command failure remains fail-closed.
 - Any ambiguous or missing critical metadata is emitted as incomplete/ambiguous, so policy/planner fail closed and skip deletion.
 - Volume discovery enriches `size_bytes` using `docker system df -v` volume output so delete-cap enforcement can remain bounded.
 - Build cache discovery uses `docker system df -v` build-cache output:
@@ -69,6 +71,11 @@ The implementation is in `src/docker_backend.rs`.
 - On real execution, re-validates safety before delete:
   - Container delete is blocked if container is running.
   - Image delete is blocked if image is referenced by any container.
+  - Image reference detection first uses `docker ps -a --format {{.ImageID}}`.
+  - If Docker does not support `.ImageID` in that template, execution falls back to:
+    - `docker ps -a -q --no-trunc`
+    - `docker container inspect --format {{.Image}} <container-id>`
+  - Fallback inspect output must include an image reference for every container; otherwise execution fails closed.
   - Volume delete is blocked if volume is attached to any container.
   - Build cache delete uses `docker builder prune -f` and adds an `until=<hours>` filter when age metadata is available.
   - When planner caps a build-cache action size for delete-budget enforcement, execution applies reclaim budget controls (`--max-used-space`, with `--keep-storage` fallback) so oversized cache sets can be reduced incrementally across runs.
@@ -100,5 +107,6 @@ The implementation is in `src/docker_backend.rs`.
 - Execution safety guards:
   - running containers are never deleted
   - referenced images are never deleted
+  - referenced images are still blocked when `docker ps` template output does not provide `.ImageID`
   - build-cache prune execution path and age-filtered prune path
   - dry-run performs no delete command

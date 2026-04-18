@@ -21,6 +21,10 @@ pub struct CleanupConfig {
     pub max_delete_per_run_gb: u64,
     /// Safety default: do not perform real deletions unless explicitly disabled.
     pub dry_run: bool,
+    /// Opt-in compatibility mode:
+    /// when true, Docker images with missing labels metadata may be treated as
+    /// having empty labels only after explicit null-label verification.
+    pub allow_missing_image_labels: bool,
     /// Image IDs or names that must never be deleted.
     pub protected_images: Vec<String>,
     /// Volume IDs or names that must never be deleted.
@@ -38,6 +42,7 @@ impl Default for CleanupConfig {
             min_unused_age_days: 7,
             max_delete_per_run_gb: 10,
             dry_run: true,
+            allow_missing_image_labels: false,
             protected_images: Vec::new(),
             protected_volumes: Vec::new(),
             protected_labels: Vec::new(),

@@ -376,6 +376,7 @@ fn discovery_request() -> CandidateDiscoveryRequest {
             min_unused_age_days: 7,
             max_delete_per_run_gb: 5,
             dry_run: false,
+            allow_missing_image_labels: false,
             protected_images: vec![],
             protected_volumes: vec![],
             protected_labels: vec![],

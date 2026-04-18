@@ -371,6 +371,7 @@ fn base_config() -> CleanupConfig {
         min_unused_age_days: 7,
         max_delete_per_run_gb: 10,
         dry_run: false,
+        allow_missing_image_labels: false,
         protected_images: Vec::new(),
         protected_volumes: Vec::new(),
         protected_labels: Vec::new(),
