@@ -4,7 +4,7 @@ use crate::domain::{
     ExecutionMode, ExecutionRequest, ExecutionResponse, HealthReport, ResourceKind, UsageSnapshot,
 };
 use crate::error::{CleanupError, Result};
-use std::collections::{BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -16,6 +16,10 @@ const IMAGE_INSPECT_TEMPLATE_NO_LABELS: &str =
     "{{.Id}}\t{{range .RepoTags}}{{.}};{{end}}\t{{.Created}}\t{{.Size}}\t";
 const VOLUME_INSPECT_TEMPLATE: &str =
     "{{.Name}}\t{{.CreatedAt}}\t{{range $k,$v := .Labels}}{{$k}}={{$v}};{{end}}";
+const VOLUME_SIZE_TEMPLATE: &str = "{{range .Volumes}}{{println .Name \"\\t\" .Size}}{{end}}";
+const BUILD_CACHE_TEMPLATE: &str =
+    "{{range .BuildCache}}{{println .ID \"\\t\" .Size \"\\t\" .InUse \"\\t\" .LastUsedAt \"\\t\" .CreatedAt}}{{end}}";
+const BUILD_CACHE_CANDIDATE_ID: &str = "docker-build-cache-unused";
 
 /// Command execution abstraction used by Docker backend operations.
 ///
@@ -179,11 +183,39 @@ impl<R: CommandRunner> DockerBackend<R> {
         }
     }
 
+    fn prune_build_cache(&self, candidate: &CandidateArtifact) -> Result<()> {
+        if candidate.identifier != BUILD_CACHE_CANDIDATE_ID {
+            return Err(CleanupError::ExecutionFailed {
+                backend: BackendKind::Docker,
+                message: format!(
+                    "unexpected build cache candidate identifier `{}`",
+                    candidate.identifier
+                ),
+            });
+        }
+
+        let mut args = vec!["builder".to_string(), "prune".to_string(), "-f".to_string()];
+        if let Some(age_days) = candidate.age_days {
+            if age_days > 0 {
+                args.push("--filter".to_string());
+                args.push(format!("until={}h", age_days.saturating_mul(24)));
+            }
+        }
+        let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
+        self.run_docker(&arg_refs)
+            .map(|_| ())
+            .map_err(|message| CleanupError::ExecutionFailed {
+                backend: BackendKind::Docker,
+                message: format!("build cache prune failed: {message}"),
+            })
+    }
+
     fn delete_resource(&self, kind: &ResourceKind, identifier: &str) -> Result<()> {
         let command_error = match kind {
             ResourceKind::Container => self.run_docker(&["container", "rm", identifier]),
             ResourceKind::Image => self.run_docker(&["image", "rm", identifier]),
             ResourceKind::Volume => self.run_docker(&["volume", "rm", identifier]),
+            ResourceKind::BuildCache => self.run_docker(&["builder", "prune", "-f"]),
             ResourceKind::Unknown(kind) => {
                 return Err(CleanupError::ExecutionFailed {
                     backend: BackendKind::Docker,
@@ -358,14 +390,24 @@ impl<R: CommandRunner> CandidateDiscoverer for DockerBackend<R> {
             ));
         }
 
-        let volume_names = self
+        let volume_names_raw = self
             .run_docker(&["volume", "ls", "-q"])
             .map_err(|message| CleanupError::CandidateDiscoveryFailed {
                 backend: BackendKind::Docker,
                 message,
             })?;
+        let volume_names: Vec<&str> = non_empty_lines(&volume_names_raw);
+        let volume_sizes = if volume_names.is_empty() {
+            BTreeMap::new()
+        } else {
+            self.collect_volume_size_map()
+                .map_err(|message| CleanupError::CandidateDiscoveryFailed {
+                    backend: BackendKind::Docker,
+                    message,
+                })?
+        };
 
-        for volume_name in non_empty_lines(&volume_names) {
+        for volume_name in volume_names {
             let inspect =
                 self.run_docker(&["volume", "inspect", "--format", VOLUME_INSPECT_TEMPLATE, volume_name])
                     .map_err(|message| CleanupError::CandidateDiscoveryFailed {
@@ -378,7 +420,18 @@ impl<R: CommandRunner> CandidateDiscoverer for DockerBackend<R> {
                 now,
                 &attached_volume_names,
                 &running_attached_volume_names,
+                &volume_sizes,
             ));
+        }
+
+        if let Some(build_cache_candidate) = self
+            .build_build_cache_candidate(now, request.config.min_unused_age_days)
+            .map_err(|message| CleanupError::CandidateDiscoveryFailed {
+                backend: BackendKind::Docker,
+                message,
+            })?
+        {
+            candidates.push(build_cache_candidate);
         }
 
         Ok(CandidateDiscoveryResponse {
@@ -424,6 +477,7 @@ impl<R: CommandRunner> ExecutionContract for DockerBackend<R> {
             ResourceKind::Container => self.ensure_container_not_running(&action.candidate.identifier)?,
             ResourceKind::Image => self.ensure_image_not_referenced(&action.candidate.identifier)?,
             ResourceKind::Volume => self.ensure_volume_not_attached(&action.candidate.identifier)?,
+            ResourceKind::BuildCache => self.prune_build_cache(&action.candidate)?,
             ResourceKind::Unknown(ref kind) => {
                 return Err(CleanupError::ExecutionFailed {
                     backend: BackendKind::Docker,
@@ -432,7 +486,9 @@ impl<R: CommandRunner> ExecutionContract for DockerBackend<R> {
             }
         }
 
-        self.delete_resource(&action.candidate.resource_kind, &action.candidate.identifier)?;
+        if !matches!(action.candidate.resource_kind, ResourceKind::BuildCache) {
+            self.delete_resource(&action.candidate.resource_kind, &action.candidate.identifier)?;
+        }
 
         Ok(ExecutionResponse {
             backend: BackendKind::Docker,
@@ -441,6 +497,115 @@ impl<R: CommandRunner> ExecutionContract for DockerBackend<R> {
             dry_run: false,
             message: Some("delete_executed".to_string()),
         })
+    }
+}
+
+impl<R: CommandRunner> DockerBackend<R> {
+    fn collect_volume_size_map(&self) -> std::result::Result<BTreeMap<String, u64>, String> {
+        let output = self
+            .run_docker(&["system", "df", "-v", "--format", VOLUME_SIZE_TEMPLATE])
+            .map_err(|message| format!("failed collecting docker volume sizes: {message}"))?;
+        let mut volume_sizes = BTreeMap::new();
+
+        for line in non_empty_lines(&output) {
+            let mut fields = line.split('\t').map(str::trim);
+            let Some(name) = fields.next() else {
+                continue;
+            };
+            let Some(size_raw) = fields.next() else {
+                continue;
+            };
+            if name.is_empty() {
+                continue;
+            }
+            if let Some(size_bytes) = parse_human_size_bytes(size_raw) {
+                volume_sizes.insert(name.to_string(), size_bytes);
+            }
+        }
+
+        Ok(volume_sizes)
+    }
+
+    fn build_build_cache_candidate(
+        &self,
+        now: SystemTime,
+        min_unused_age_days: u64,
+    ) -> std::result::Result<Option<CandidateArtifact>, String> {
+        let output = self
+            .run_docker(&["system", "df", "-v", "--format", BUILD_CACHE_TEMPLATE])
+            .map_err(|message| format!("failed collecting docker build cache details: {message}"))?;
+
+        let mut eligible_entries = 0usize;
+        let mut eligible_unknown_metadata = false;
+        let mut total_size_bytes: u64 = 0;
+        let mut min_eligible_age_days: Option<u64> = None;
+
+        for line in non_empty_lines(&output) {
+            let fields: Vec<&str> = line.split('\t').map(str::trim).collect();
+            let identifier = fields.first().copied().unwrap_or_default();
+            if identifier.is_empty() {
+                continue;
+            }
+
+            let size_bytes = fields.get(1).and_then(|value| parse_human_size_bytes(value));
+            let in_use = fields.get(2).and_then(|value| parse_bool(value));
+            let last_used_at = fields.get(3).copied().unwrap_or_default();
+            let created_at = fields.get(4).copied().unwrap_or_default();
+            let age_source = if !last_used_at.is_empty() && last_used_at != "<nil>" {
+                last_used_at
+            } else {
+                created_at
+            };
+            let age_days = parse_age_days(age_source, now);
+
+            let is_eligible = matches!(in_use, Some(false))
+                && age_days
+                    .map(|age| age >= min_unused_age_days)
+                    .unwrap_or(false);
+            if !is_eligible {
+                continue;
+            }
+
+            eligible_entries += 1;
+            match (size_bytes, age_days) {
+                (Some(size), Some(age)) => {
+                    total_size_bytes = total_size_bytes.saturating_add(size);
+                    min_eligible_age_days = Some(match min_eligible_age_days {
+                        Some(current) => current.min(age),
+                        None => age,
+                    });
+                }
+                _ => {
+                    eligible_unknown_metadata = true;
+                }
+            }
+        }
+
+        if eligible_entries == 0 {
+            return Ok(None);
+        }
+
+        let metadata_complete =
+            !eligible_unknown_metadata && total_size_bytes > 0 && min_eligible_age_days.is_some();
+        Ok(Some(CandidateArtifact {
+            backend: BackendKind::Docker,
+            resource_kind: ResourceKind::BuildCache,
+            identifier: BUILD_CACHE_CANDIDATE_ID.to_string(),
+            display_name: Some("docker-build-cache".to_string()),
+            labels: BTreeSet::new(),
+            size_bytes: if total_size_bytes > 0 {
+                Some(total_size_bytes)
+            } else {
+                None
+            },
+            age_days: min_eligible_age_days,
+            in_use: Some(false),
+            referenced: Some(false),
+            protected: false,
+            metadata_complete,
+            metadata_ambiguous: !metadata_complete,
+            discovered_at: Some(now),
+        }))
     }
 }
 
@@ -593,6 +758,7 @@ fn parse_volume_candidate(
     now: SystemTime,
     attached_volume_names: &HashSet<String>,
     running_attached_volume_names: &HashSet<String>,
+    volume_sizes: &BTreeMap<String, u64>,
 ) -> CandidateArtifact {
     let line = first_non_empty_line(inspect_output).unwrap_or_default();
     let fields: Vec<&str> = line.split('\t').collect();
@@ -619,9 +785,14 @@ fn parse_volume_candidate(
     } else {
         Some(running_attached_volume_names.contains(&identifier))
     };
+    let size_bytes = volume_sizes.get(&identifier).copied();
 
     let metadata_complete =
-        !identifier.is_empty() && age_days.is_some() && in_use.is_some() && referenced.is_some();
+        !identifier.is_empty()
+            && age_days.is_some()
+            && in_use.is_some()
+            && referenced.is_some()
+            && size_bytes.is_some();
 
     CandidateArtifact {
         backend: BackendKind::Docker,
@@ -629,7 +800,7 @@ fn parse_volume_candidate(
         identifier: identifier.clone(),
         display_name: Some(identifier),
         labels,
-        size_bytes: None,
+        size_bytes,
         age_days,
         in_use,
         referenced,
@@ -697,11 +868,46 @@ fn parse_semicolon_list(raw: &str) -> Vec<String> {
 }
 
 fn parse_bool(value: &str) -> Option<bool> {
-    match value {
+    match value.to_ascii_lowercase().as_str() {
         "true" => Some(true),
         "false" => Some(false),
         _ => None,
     }
+}
+
+fn parse_human_size_bytes(raw: &str) -> Option<u64> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    let split_index = trimmed
+        .find(|ch: char| !(ch.is_ascii_digit() || ch == '.'))
+        .unwrap_or(trimmed.len());
+    let (value_raw, unit_raw) = trimmed.split_at(split_index);
+    let value = value_raw.parse::<f64>().ok()?;
+    if !value.is_finite() || value < 0.0 {
+        return None;
+    }
+
+    let multiplier = match unit_raw.trim().to_ascii_lowercase().as_str() {
+        "" | "b" => 1.0,
+        "kb" => 1_000.0,
+        "mb" => 1_000_000.0,
+        "gb" => 1_000_000_000.0,
+        "tb" => 1_000_000_000_000.0,
+        "kib" => 1024.0,
+        "mib" => 1_048_576.0,
+        "gib" => 1_073_741_824.0,
+        "tib" => 1_099_511_627_776.0,
+        _ => return None,
+    };
+
+    let bytes = value * multiplier;
+    if !bytes.is_finite() || bytes < 0.0 {
+        return None;
+    }
+    Some(bytes.round() as u64)
 }
 
 fn normalize_image_id(image_id: &str) -> String {

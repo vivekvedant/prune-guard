@@ -151,6 +151,13 @@ impl<R: CommandRunner> PodmanBackend<R> {
             ResourceKind::Container => self.run_podman(&["container", "rm", identifier]),
             ResourceKind::Image => self.run_podman(&["image", "rm", identifier]),
             ResourceKind::Volume => self.run_podman(&["volume", "rm", identifier]),
+            ResourceKind::BuildCache => {
+                return Err(CleanupError::ExecutionFailed {
+                    backend: BackendKind::Podman,
+                    message: "build cache cleanup is currently unsupported for podman backend"
+                        .to_string(),
+                });
+            }
             ResourceKind::Unknown(kind) => {
                 return Err(CleanupError::ExecutionFailed {
                     backend: BackendKind::Podman,
@@ -366,6 +373,13 @@ impl<R: CommandRunner> ExecutionContract for PodmanBackend<R> {
             ResourceKind::Container => self.ensure_container_not_running(&action.candidate.identifier)?,
             ResourceKind::Image => self.ensure_image_not_referenced(&action.candidate.identifier)?,
             ResourceKind::Volume => self.ensure_volume_not_attached(&action.candidate.identifier)?,
+            ResourceKind::BuildCache => {
+                return Err(CleanupError::ExecutionFailed {
+                    backend: BackendKind::Podman,
+                    message: "build cache cleanup is currently unsupported for podman backend"
+                        .to_string(),
+                });
+            }
             ResourceKind::Unknown(ref kind) => {
                 return Err(CleanupError::ExecutionFailed {
                     backend: BackendKind::Podman,

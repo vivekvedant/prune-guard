@@ -57,6 +57,7 @@ impl CleanupPlanner {
             .max_delete_per_run_gb
             .saturating_mul(Self::BYTES_PER_GIB);
         let mut remaining_delete_bytes = max_delete_bytes;
+        let mut unknown_size_budget_reserved = false;
 
         for candidate in candidates {
             let candidate = match policy.evaluate_candidate(candidate) {
@@ -78,12 +79,25 @@ impl CleanupPlanner {
             let size_bytes = match candidate.size_bytes {
                 Some(size_bytes) => size_bytes,
                 None => {
-                    // Fail closed: if reclaimed size is unknown we cannot safely enforce the cap.
-                    skipped.push(SkippedCandidate {
-                        candidate,
-                        reason: "candidate_size_unknown".to_string(),
-                    });
-                    continue;
+                    // Conservative fallback for unknown sizes:
+                    // - at most one unknown-size candidate may proceed per run
+                    // - reserve the full remaining budget immediately
+                    // This keeps behavior bounded while preserving strict cap pressure.
+                    if remaining_delete_bytes == 0 || unknown_size_budget_reserved {
+                        skipped.push(SkippedCandidate {
+                            candidate,
+                            reason: if remaining_delete_bytes == 0 {
+                                SKIPPED_REASON_DELETION_CAP_REACHED.to_string()
+                            } else {
+                                "candidate_size_unknown".to_string()
+                            },
+                        });
+                        continue;
+                    }
+
+                    unknown_size_budget_reserved = true;
+                    remaining_delete_bytes = 0;
+                    0
                 }
             };
 

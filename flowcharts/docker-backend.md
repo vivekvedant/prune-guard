@@ -6,7 +6,8 @@ This document captures Docker adapter control flow and safety guards.
 
 ```mermaid
 flowchart TD
-    A[Collect Docker containers/images/volumes] --> B[Inspect image with labels template]
+    A[Collect Docker containers/images/volumes/build-cache] --> A1[Load volume sizes via docker system df -v]
+    A1 --> B[Inspect image with labels template]
     B --> C{Labels inspect hit known missing-labels template error?}
     C -- Yes --> D[Retry image inspect with labels-free template]
     C -- No --> E[Use primary inspect output]
@@ -36,9 +37,13 @@ flowchart TD
     D -- Volume --> J{Volume attached now?}
     J -- Yes --> Z
     J -- No --> W[Run docker volume rm]
+    D -- BuildCache --> L{Build cache candidate id valid?}
+    L -- No --> Z
+    L -- Yes --> M[Run docker builder prune -f and optional until filter]
     X --> K[Return executed=true]
     Y --> K
     W --> K
+    M --> K
 ```
 
 Notes:

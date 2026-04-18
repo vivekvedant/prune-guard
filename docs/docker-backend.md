@@ -28,7 +28,7 @@ The implementation is in `src/docker_backend.rs`.
 
 ### Candidate Discovery
 
-- Discovers containers, images, and volumes through Docker CLI inspect/list commands.
+- Discovers containers, images, volumes, and aggregate build-cache cleanup candidates through Docker CLI inspect/list commands.
 - Converts each resource into `CandidateArtifact` with safety metadata:
   - `in_use`
   - `referenced`
@@ -45,6 +45,11 @@ The implementation is in `src/docker_backend.rs`.
   - If Docker returns the known template error (`map has no entry for key "Labels"`), discovery retries with a labels-free inspect template.
   - Fallback candidates are emitted with `metadata_complete = false` / `metadata_ambiguous = true` so policy always skips deletion.
 - Any ambiguous or missing critical metadata is emitted as incomplete/ambiguous, so policy/planner fail closed and skip deletion.
+- Volume discovery enriches `size_bytes` using `docker system df -v` volume output so delete-cap enforcement can remain bounded.
+- Build cache discovery uses `docker system df -v` build-cache output:
+  - only non-in-use entries at/above `min_unused_age_days` are considered
+  - candidate size is aggregated from eligible entries
+  - if any eligible entry has ambiguous size/age metadata, candidate is marked incomplete and skipped fail-closed
 
 ### Action Execution
 
@@ -53,6 +58,7 @@ The implementation is in `src/docker_backend.rs`.
   - Container delete is blocked if container is running.
   - Image delete is blocked if image is referenced by any container.
   - Volume delete is blocked if volume is attached to any container.
+  - Build cache delete uses `docker builder prune -f` and adds an `until=<hours>` filter when age metadata is available.
 - Safety blocks return `CleanupError::SafetyViolation`.
 - Delete command failures return `CleanupError::ExecutionFailed`.
 
@@ -78,4 +84,5 @@ The implementation is in `src/docker_backend.rs`.
 - Execution safety guards:
   - running containers are never deleted
   - referenced images are never deleted
+  - build-cache prune execution path and age-filtered prune path
   - dry-run performs no delete command

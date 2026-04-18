@@ -89,6 +89,10 @@ fn discovery_marks_running_referenced_and_attached_resources_as_unsafe() {
         ),
         ok("docker|volume|ls|-q", "vol-live\nvol-old\nvol-free\n"),
         ok(
+            "docker|system|df|-v|--format|{{range .Volumes}}{{println .Name \"\\t\" .Size}}{{end}}",
+            "vol-live\t100MB\nvol-old\t50MB\nvol-free\t30MB\n",
+        ),
+        ok(
             "docker|volume|inspect|--format|{{.Name}}\t{{.CreatedAt}}\t{{range $k,$v := .Labels}}{{$k}}={{$v}};{{end}}|vol-live",
             "vol-live\t2024-01-01T00:00:00Z\t;\n",
         ),
@@ -99,6 +103,10 @@ fn discovery_marks_running_referenced_and_attached_resources_as_unsafe() {
         ok(
             "docker|volume|inspect|--format|{{.Name}}\t{{.CreatedAt}}\t{{range $k,$v := .Labels}}{{$k}}={{$v}};{{end}}|vol-free",
             "vol-free\t2024-01-01T00:00:00Z\t;\n",
+        ),
+        ok(
+            "docker|system|df|-v|--format|{{range .BuildCache}}{{println .ID \"\\t\" .Size \"\\t\" .InUse \"\\t\" .LastUsedAt \"\\t\" .CreatedAt}}{{end}}",
+            "",
         ),
     ]);
     let backend = DockerBackend::with_runner(runner);
@@ -138,6 +146,7 @@ fn discovery_marks_running_referenced_and_attached_resources_as_unsafe() {
         .expect("detached volume candidate should exist");
     assert_eq!(detached_volume.in_use, Some(false));
     assert_eq!(detached_volume.referenced, Some(false));
+    assert_eq!(detached_volume.size_bytes, Some(30_000_000));
 }
 
 #[test]
@@ -150,6 +159,10 @@ fn discovery_marks_ambiguous_metadata_as_not_complete() {
         ),
         ok("docker|image|ls|-q|--no-trunc", ""),
         ok("docker|volume|ls|-q", ""),
+        ok(
+            "docker|system|df|-v|--format|{{range .BuildCache}}{{println .ID \"\\t\" .Size \"\\t\" .InUse \"\\t\" .LastUsedAt \"\\t\" .CreatedAt}}{{end}}",
+            "",
+        ),
     ]);
     let backend = DockerBackend::with_runner(runner);
 
@@ -187,6 +200,10 @@ fn discovery_degrades_when_image_labels_are_unavailable() {
             "sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11\trepo/no-labels:latest;\t2024-01-01T00:00:00Z\t2048\t\n",
         ),
         ok("docker|volume|ls|-q", ""),
+        ok(
+            "docker|system|df|-v|--format|{{range .BuildCache}}{{println .ID \"\\t\" .Size \"\\t\" .InUse \"\\t\" .LastUsedAt \"\\t\" .CreatedAt}}{{end}}",
+            "",
+        ),
     ]);
     let backend = DockerBackend::with_runner(runner);
 
@@ -207,6 +224,79 @@ fn discovery_degrades_when_image_labels_are_unavailable() {
     assert!(image.metadata_ambiguous);
     assert!(image.labels.is_empty());
     assert_eq!(image.referenced, Some(false));
+}
+
+#[test]
+fn discovery_uses_verbose_df_sizes_for_volumes() {
+    let runner = FakeRunner::new(vec![
+        ok("docker|ps|-a|-q|--no-trunc", ""),
+        ok("docker|image|ls|-q|--no-trunc", ""),
+        ok("docker|volume|ls|-q", "vol-a\n"),
+        ok(
+            "docker|system|df|-v|--format|{{range .Volumes}}{{println .Name \"\\t\" .Size}}{{end}}",
+            "vol-a\t67.11MB\n",
+        ),
+        ok(
+            "docker|volume|inspect|--format|{{.Name}}\t{{.CreatedAt}}\t{{range $k,$v := .Labels}}{{$k}}={{$v}};{{end}}|vol-a",
+            "vol-a\t2024-01-01T00:00:00Z\t;\n",
+        ),
+        ok(
+            "docker|system|df|-v|--format|{{range .BuildCache}}{{println .ID \"\\t\" .Size \"\\t\" .InUse \"\\t\" .LastUsedAt \"\\t\" .CreatedAt}}{{end}}",
+            "",
+        ),
+    ]);
+    let backend = DockerBackend::with_runner(runner.clone());
+
+    let response = backend
+        .discover_candidates(discovery_request())
+        .expect("discovery should parse volume size map from docker system df");
+
+    let volume = response
+        .candidates
+        .iter()
+        .find(|candidate| candidate.identifier == "vol-a")
+        .expect("volume candidate should exist");
+
+    assert!(
+        volume.size_bytes.is_some(),
+        "volume size should be populated from docker system df -v"
+    );
+    assert!(
+        runner.calls().iter().any(|call| {
+            call == "docker|system|df|-v|--format|{{range .Volumes}}{{println .Name \"\\t\" .Size}}{{end}}"
+        }),
+        "discovery should invoke docker system df verbose volume template"
+    );
+}
+
+#[test]
+fn discovery_emits_build_cache_candidate_with_known_size() {
+    let runner = FakeRunner::new(vec![
+        ok("docker|ps|-a|-q|--no-trunc", ""),
+        ok("docker|image|ls|-q|--no-trunc", ""),
+        ok("docker|volume|ls|-q", ""),
+        ok(
+            "docker|system|df|-v|--format|{{range .BuildCache}}{{println .ID \"\\t\" .Size \"\\t\" .InUse \"\\t\" .LastUsedAt \"\\t\" .CreatedAt}}{{end}}",
+            "cache-1\t100MB\tfalse\t2024-01-01T00:00:00Z\t2024-01-01T00:00:00Z\ncache-2\t50MB\ttrue\t2024-01-01T00:00:00Z\t2024-01-01T00:00:00Z\n",
+        ),
+    ]);
+    let backend = DockerBackend::with_runner(runner);
+
+    let response = backend
+        .discover_candidates(discovery_request())
+        .expect("discovery should synthesize a build cache candidate");
+
+    let cache_candidate = response
+        .candidates
+        .iter()
+        .find(|candidate| candidate.resource_kind == ResourceKind::BuildCache)
+        .expect("build cache candidate should be present");
+
+    assert_eq!(cache_candidate.identifier, "docker-build-cache-unused");
+    assert_eq!(cache_candidate.size_bytes, Some(100_000_000));
+    assert_eq!(cache_candidate.in_use, Some(false));
+    assert_eq!(cache_candidate.referenced, Some(false));
+    assert!(cache_candidate.metadata_complete);
 }
 
 #[test]
@@ -283,6 +373,57 @@ fn execution_dry_run_returns_without_delete_command() {
     assert!(
         runner.calls().is_empty(),
         "dry-run execution must not invoke docker delete commands"
+    );
+}
+
+#[test]
+fn execution_prunes_build_cache_in_real_run() {
+    let runner = FakeRunner::new(vec![ok("docker|builder|prune|-f", "Total:\t0B\n")]);
+    let backend = DockerBackend::with_runner(runner.clone());
+
+    let response = backend
+        .execute(build_cache_execution_request(
+            "docker-build-cache-unused",
+            Some(0),
+            ExecutionMode::RealRun,
+        ))
+        .expect("build cache candidate should execute prune command");
+
+    assert!(response.executed);
+    assert!(!response.dry_run);
+    assert!(
+        runner
+            .calls()
+            .iter()
+            .any(|call| call == "docker|builder|prune|-f"),
+        "build cache execution should call docker builder prune"
+    );
+}
+
+#[test]
+fn execution_prunes_build_cache_with_age_filter_when_present() {
+    let runner = FakeRunner::new(vec![ok(
+        "docker|builder|prune|-f|--filter|until=48h",
+        "Total:\t0B\n",
+    )]);
+    let backend = DockerBackend::with_runner(runner.clone());
+
+    let response = backend
+        .execute(build_cache_execution_request(
+            "docker-build-cache-unused",
+            Some(2),
+            ExecutionMode::RealRun,
+        ))
+        .expect("build cache prune should include age filter for non-zero age");
+
+    assert!(response.executed);
+    assert!(!response.dry_run);
+    assert!(
+        runner
+            .calls()
+            .iter()
+            .any(|call| call == "docker|builder|prune|-f|--filter|until=48h"),
+        "build cache execution should pass until-hour filter"
     );
 }
 
@@ -399,6 +540,37 @@ fn execution_request(
             kind: CleanupActionKind::Delete,
             dry_run: matches!(mode, ExecutionMode::DryRun),
             reason: Some("test action".to_string()),
+        },
+        mode,
+    }
+}
+
+fn build_cache_execution_request(
+    id: &str,
+    age_days: Option<u64>,
+    mode: ExecutionMode,
+) -> ExecutionRequest {
+    ExecutionRequest {
+        backend: BackendKind::Docker,
+        action: PlannedAction {
+            candidate: prune_guard::CandidateArtifact {
+                backend: BackendKind::Docker,
+                resource_kind: ResourceKind::BuildCache,
+                identifier: id.to_string(),
+                display_name: Some("docker-build-cache".to_string()),
+                labels: BTreeSet::new(),
+                size_bytes: Some(1024),
+                age_days,
+                in_use: Some(false),
+                referenced: Some(false),
+                protected: false,
+                metadata_complete: true,
+                metadata_ambiguous: false,
+                discovered_at: None,
+            },
+            kind: CleanupActionKind::Delete,
+            dry_run: matches!(mode, ExecutionMode::DryRun),
+            reason: Some("build cache test action".to_string()),
         },
         mode,
     }

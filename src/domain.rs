@@ -63,6 +63,7 @@ pub enum ResourceKind {
     Container,
     Image,
     Volume,
+    BuildCache,
     Unknown(String),
 }
 

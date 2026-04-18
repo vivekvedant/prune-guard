@@ -45,8 +45,32 @@ fn planner_respects_per_run_delete_cap_and_preserves_order() {
 }
 
 #[test]
-fn planner_skips_candidate_when_size_is_unknown() {
+fn planner_uses_conservative_fallback_for_first_unknown_size_candidate() {
     let cfg = base_config();
+    let planner = CleanupPlanner::new(cfg.clone());
+    let request = ActionPlanningRequest {
+        backend: BackendKind::Docker,
+        config: cfg,
+        usage: usage_template(),
+        candidates: vec![
+            candidate_template("img-size-unknown-1", BackendKind::Docker, None),
+            candidate_template("img-size-unknown-2", BackendKind::Docker, None),
+        ],
+    };
+
+    let plan = planner.plan(request);
+
+    assert_eq!(plan.actions.len(), 1);
+    assert_eq!(plan.actions[0].candidate.identifier, "img-size-unknown-1");
+    assert_eq!(plan.skipped.len(), 1);
+    assert_eq!(plan.skipped[0].candidate.identifier, "img-size-unknown-2");
+    assert_eq!(plan.skipped[0].reason, "deletion_cap_reached");
+}
+
+#[test]
+fn planner_skips_unknown_size_candidate_when_delete_budget_is_zero() {
+    let mut cfg = base_config();
+    cfg.max_delete_per_run_gb = 0;
     let planner = CleanupPlanner::new(cfg.clone());
     let request = ActionPlanningRequest {
         backend: BackendKind::Docker,
@@ -63,7 +87,7 @@ fn planner_skips_candidate_when_size_is_unknown() {
 
     assert!(plan.actions.is_empty());
     assert_eq!(plan.skipped.len(), 1);
-    assert_eq!(plan.skipped[0].reason, "candidate_size_unknown");
+    assert_eq!(plan.skipped[0].reason, "deletion_cap_reached");
 }
 
 #[test]
@@ -220,25 +244,17 @@ fn planner_preserves_skipped_order_across_policy_and_planner_rejections() {
         .iter()
         .map(|entry| entry.reason.as_str())
         .collect();
+    let planned_ids: Vec<&str> = plan
+        .actions
+        .iter()
+        .map(|action| action.candidate.identifier.as_str())
+        .collect();
 
-    assert!(plan.actions.is_empty());
-    assert_eq!(
-        skipped_ids,
-        vec![
-            "img-cap-first",
-            "img-policy-second",
-            "img-backend-third",
-            "img-size-fourth"
-        ]
-    );
+    assert_eq!(planned_ids, vec!["img-size-fourth"]);
+    assert_eq!(skipped_ids, vec!["img-cap-first", "img-policy-second", "img-backend-third"]);
     assert_eq!(
         skipped_reasons,
-        vec![
-            "deletion_cap_reached",
-            "metadata_incomplete",
-            "candidate_backend_mismatch",
-            "candidate_size_unknown"
-        ]
+        vec!["deletion_cap_reached", "metadata_incomplete", "candidate_backend_mismatch"]
     );
 }
 

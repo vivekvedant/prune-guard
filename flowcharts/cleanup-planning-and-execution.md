@@ -12,7 +12,10 @@ flowchart TD
     C -- Yes --> D{Candidate Backend Matches Plan Backend?}
     D -- No --> R2[Skip: candidate_backend_mismatch]
     D -- Yes --> E{size_bytes known?}
-    E -- No --> R3[Skip: candidate_size_unknown]
+    E -- No --> E1{unknown-size fallback budget available?}
+    E1 -- No --> R3[Skip: deletion_cap_reached]
+    E1 -- Yes --> E2[Reserve full remaining delete budget]
+    E2 --> G
     E -- Yes --> F{size_bytes <= remaining_delete_budget?}
     F -- No --> R4[Skip: deletion_cap_reached]
     F -- Yes --> G[Create PlannedAction Delete]
