@@ -14,6 +14,7 @@ const IMAGE_INSPECT_TEMPLATE: &str =
     "{{.Id}}\t{{range .RepoTags}}{{.}};{{end}}\t{{.Created}}\t{{.Size}}\t{{range $k,$v := .Config.Labels}}{{$k}}={{$v}};{{end}}";
 const IMAGE_INSPECT_TEMPLATE_NO_LABELS: &str =
     "{{.Id}}\t{{range .RepoTags}}{{.}};{{end}}\t{{.Created}}\t{{.Size}}\t";
+const IMAGE_LABELS_JSON_TEMPLATE: &str = "{{json .Config.Labels}}";
 const VOLUME_INSPECT_TEMPLATE: &str =
     "{{.Name}}\t{{.CreatedAt}}\t{{range $k,$v := .Labels}}{{$k}}={{$v}};{{end}}";
 
@@ -137,18 +138,10 @@ impl<R: CommandRunner> DockerBackend<R> {
     }
 
     fn ensure_image_not_referenced(&self, image_id: &str) -> Result<()> {
-        let output =
-            self.run_docker(&["ps", "-a", "--format", "{{.ImageID}}"])
-                .map_err(|message| CleanupError::ExecutionFailed {
-                    backend: BackendKind::Docker,
-                    message: format!("failed to discover image references: {message}"),
-                })?;
+        let referenced_image_ids = self.collect_referenced_image_ids()?;
 
         let normalized_target = normalize_image_id(image_id);
-        let referenced = non_empty_lines(&output)
-            .into_iter()
-            .map(normalize_image_id)
-            .any(|candidate| candidate == normalized_target);
+        let referenced = referenced_image_ids.contains(&normalized_target);
 
         if referenced {
             Err(CleanupError::SafetyViolation {
@@ -157,6 +150,79 @@ impl<R: CommandRunner> DockerBackend<R> {
         } else {
             Ok(())
         }
+    }
+
+    fn collect_referenced_image_ids(&self) -> Result<HashSet<String>> {
+        match self.run_docker(&["ps", "-a", "--format", "{{.ImageID}}"]) {
+            Ok(output) => Ok(non_empty_lines(&output)
+                .into_iter()
+                .map(normalize_image_id)
+                .collect()),
+            Err(message) => {
+                if !is_unsupported_image_id_template_error(&message) {
+                    return Err(CleanupError::ExecutionFailed {
+                        backend: BackendKind::Docker,
+                        message: format!("failed to discover image references: {message}"),
+                    });
+                }
+
+                // Compatibility fallback for Docker variants that do not expose
+                // `.ImageID` in `docker ps --format`. We inspect each container
+                // directly and fail closed if any image reference is ambiguous.
+                let container_ids =
+                    self.run_docker(&["ps", "-a", "-q", "--no-trunc"])
+                        .map_err(|fallback_message| CleanupError::ExecutionFailed {
+                            backend: BackendKind::Docker,
+                            message: format!(
+                                "failed to discover image references via fallback container listing: {fallback_message}"
+                            ),
+                        })?;
+                let mut referenced_image_ids = HashSet::new();
+                for container_id in non_empty_lines(&container_ids) {
+                    let inspect =
+                        self.run_docker(&["container", "inspect", "--format", "{{.Image}}", container_id])
+                            .map_err(|fallback_message| CleanupError::ExecutionFailed {
+                                backend: BackendKind::Docker,
+                                message: format!(
+                                    "failed to inspect image reference for container `{container_id}`: {fallback_message}"
+                                ),
+                            })?;
+                    let image_reference = first_non_empty_line(&inspect).ok_or_else(|| {
+                        CleanupError::ExecutionFailed {
+                            backend: BackendKind::Docker,
+                            message: format!(
+                                "failed to inspect image reference for container `{container_id}`: empty image reference output"
+                            ),
+                        }
+                    })?;
+                    referenced_image_ids.insert(normalize_image_id(image_reference));
+                }
+                Ok(referenced_image_ids)
+            }
+        }
+    }
+
+    fn can_treat_missing_image_labels_as_empty(
+        &self,
+        image_id: &str,
+        allow_missing_image_labels: bool,
+    ) -> bool {
+        if !allow_missing_image_labels {
+            return false;
+        }
+
+        // Safety gate for the opt-in mode:
+        // only accept missing labels when Docker explicitly reports JSON `null`.
+        // Any command error or non-null payload stays fail-closed.
+        let labels_output =
+            match self.run_docker(&["image", "inspect", "--format", IMAGE_LABELS_JSON_TEMPLATE, image_id]) {
+                Ok(output) => output,
+                Err(_) => return false,
+            };
+
+        first_non_empty_line(&labels_output)
+            .map(|line| line.trim() == "null")
+            .unwrap_or(false)
     }
 
     fn ensure_volume_not_attached(&self, volume_name: &str) -> Result<()> {
@@ -325,7 +391,8 @@ impl<R: CommandRunner> CandidateDiscoverer for DockerBackend<R> {
                     if is_missing_image_labels_error(&message) {
                         // Fail closed: if labels cannot be inspected due template shape
                         // differences, continue discovery but mark the image metadata
-                        // incomplete so policy skips deletion.
+                        // incomplete so policy skips deletion unless explicit null-label
+                        // verification allows safe empty-label treatment.
                         self.run_docker(&[
                             "image",
                             "inspect",
@@ -333,7 +400,13 @@ impl<R: CommandRunner> CandidateDiscoverer for DockerBackend<R> {
                             IMAGE_INSPECT_TEMPLATE_NO_LABELS,
                             image_id,
                         ])
-                        .map(|output| (output, false))
+                        .map(|output| {
+                            let labels_known = self.can_treat_missing_image_labels_as_empty(
+                                image_id,
+                                request.config.allow_missing_image_labels,
+                            );
+                            (output, labels_known)
+                        })
                         .map_err(|fallback_message| {
                             CleanupError::CandidateDiscoveryFailed {
                                 backend: BackendKind::Docker,
@@ -586,6 +659,12 @@ fn is_missing_image_labels_error(message: &str) -> bool {
     message.contains("template parsing error")
         && message.contains(".Config.Labels")
         && message.contains("map has no entry for key \"Labels\"")
+}
+
+fn is_unsupported_image_id_template_error(message: &str) -> bool {
+    message.contains("failed to execute template")
+        && message.contains("<.ImageID>")
+        && message.contains("can't evaluate field ImageID")
 }
 
 fn parse_volume_candidate(

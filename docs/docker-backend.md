@@ -43,7 +43,9 @@ The implementation is in `src/docker_backend.rs`.
 - Image discovery has a fail-closed template fallback:
   - First attempt inspects labels via `.Config.Labels`.
   - If Docker returns the known template error (`map has no entry for key "Labels"`), discovery retries with a labels-free inspect template.
-  - Fallback candidates are emitted with `metadata_complete = false` / `metadata_ambiguous = true` so policy always skips deletion.
+  - Default behavior remains fail-closed: fallback candidates are emitted with `metadata_complete = false` / `metadata_ambiguous = true` so policy skips deletion.
+  - Optional compatibility mode: set `allow_missing_image_labels = true` to allow a second safety check with `{{json .Config.Labels}}`.
+  - In compatibility mode, labels are treated as safely empty only when that JSON result is exactly `null`; any other output or command failure stays fail-closed.
 - Any ambiguous or missing critical metadata is emitted as incomplete/ambiguous, so policy/planner fail closed and skip deletion.
 
 ### Action Execution
@@ -52,6 +54,11 @@ The implementation is in `src/docker_backend.rs`.
 - On real execution, re-validates safety before delete:
   - Container delete is blocked if container is running.
   - Image delete is blocked if image is referenced by any container.
+  - Image reference detection first uses `docker ps -a --format {{.ImageID}}`.
+  - If Docker returns the known template-shape error for `.ImageID`, execution falls back to:
+    - `docker ps -a -q --no-trunc`
+    - `docker container inspect --format {{.Image}} <container-id>`
+  - Fallback inspect output must include an image reference for every container; otherwise execution fails closed.
   - Volume delete is blocked if volume is attached to any container.
 - Safety blocks return `CleanupError::SafetyViolation`.
 - Delete command failures return `CleanupError::ExecutionFailed`.
@@ -75,7 +82,9 @@ The implementation is in `src/docker_backend.rs`.
   - attached volumes
   - ambiguous metadata
   - image inspect fallback when labels are unavailable
+  - opt-in null-label verification for missing Docker labels metadata
 - Execution safety guards:
   - running containers are never deleted
   - referenced images are never deleted
+  - referenced images are still blocked when `docker ps` does not support `.ImageID` template field
   - dry-run performs no delete command
