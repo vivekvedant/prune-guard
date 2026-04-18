@@ -25,8 +25,9 @@ This phase introduces:
 
 1. run all candidates through `PolicyEngine`
 2. reject candidates whose backend does not match the plan backend
-3. reject candidates with unknown `size_bytes` (fail-closed cap enforcement)
+3. for unknown `size_bytes`, allow at most one conservative fallback action by reserving the full remaining delete budget
 4. stop adding actions when `max_delete_per_run_gb` budget is exhausted
+5. if a build-cache candidate exceeds remaining budget, plan one capped build-cache action sized to the remaining budget so cleanup can continue incrementally across runs
 
 Planner outputs:
 
@@ -49,7 +50,8 @@ Execution outputs:
 
 ## Safety Rationale
 
-- Unknown reclaim size is unsafe for delete-cap control and is rejected.
+- Unknown reclaim size is still bounded: only one unknown-size fallback action is allowed and it consumes the full remaining budget immediately.
+- Oversized build-cache candidates are chunked to remaining budget instead of being skipped forever, enabling bounded progress while preserving cap limits.
 - Dry-run mode is enforced before backend execution to avoid accidental deletion.
 - Timeout guard prevents one hanging backend operation from blocking the full run.
 - Per-action error capture avoids unsafe partial-abort logic and preserves auditability.
@@ -59,7 +61,7 @@ Execution outputs:
 `tests/planner_tests.rs` covers:
 
 - deterministic cap enforcement and order preservation
-- unknown-size fail-closed rejection
+- conservative single-action fallback for unknown-size candidates
 - backend mismatch rejection
 - policy rejection propagation into skipped list
 

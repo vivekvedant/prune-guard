@@ -20,7 +20,7 @@ It reclaims disk space by removing unused artifacts while defaulting to conserva
 - Reliability controls (retries, lock, no-op on full backend failure)
 - Observability/security preflight checks
 - Cross-platform build and packaging pipeline (Linux/macOS)
-- Linux `.deb` install path with `systemd` oneshot service + timer (`prune-guard.service`, `prune-guard.timer`)
+- Linux `.deb` install path with `systemd` daemon service (`prune-guard.service`) and bootstrap timer (`prune-guard.timer`)
 
 ## Project Structure
 
@@ -54,10 +54,13 @@ cargo run -- --config /etc/prune-guard/prune-guard.toml --once
 4. Check installed timer/service behavior after `.deb` install:
 
 ```bash
-sudo systemctl status prune-guard.timer
 sudo systemctl status prune-guard.service
+sudo systemctl status prune-guard.timer
 journalctl -u prune-guard -n 50 --no-pager
 ```
+
+`interval_secs` in `/etc/prune-guard/prune-guard.toml` controls scheduler cadence while the daemon service is running.
+Docker endpoint selection is also TOML-driven via optional `[docker].host` or `[docker].context` keys, so users do not need to edit `systemd` unit files.
 
 5. Review documentation:
 

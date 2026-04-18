@@ -34,15 +34,24 @@ fn run() -> Result<(), String> {
     let cleanup_config = to_cleanup_config(&config);
     let scheduler = CleanupScheduler::new(cleanup_config.clone());
 
-    let requested_ticks = if options.once {
-        Some(1)
-    } else {
-        options.ticks
-    };
+    let requested_ticks = if options.once { Some(1) } else { options.ticks };
 
     match backend.as_str() {
-        "docker" => run_scheduler_loop(&scheduler, DockerBackend::new(), &cleanup_config, requested_ticks),
-        "podman" => run_scheduler_loop(&scheduler, PodmanBackend::new(), &cleanup_config, requested_ticks),
+        "docker" => run_scheduler_loop(
+            &scheduler,
+            DockerBackend::with_connection(
+                config.docker_host.clone(),
+                config.docker_context.clone(),
+            ),
+            &cleanup_config,
+            requested_ticks,
+        ),
+        "podman" => run_scheduler_loop(
+            &scheduler,
+            PodmanBackend::new(),
+            &cleanup_config,
+            requested_ticks,
+        ),
         _ => Err(format!("unsupported backend selected: {backend}")),
     }
 }
@@ -54,7 +63,13 @@ fn run_scheduler_loop<B>(
     ticks: Option<usize>,
 ) -> Result<(), String>
 where
-    B: HealthCheck + UsageCollector + CandidateDiscoverer + ExecutionContract + Send + Sync + 'static,
+    B: HealthCheck
+        + UsageCollector
+        + CandidateDiscoverer
+        + ExecutionContract
+        + Send
+        + Sync
+        + 'static,
 {
     let backend = Arc::new(backend);
     let interval = Duration::from_secs(config.interval_secs);
@@ -96,11 +111,21 @@ fn log_report(tick_index: usize, report: &SchedulerRunReport) {
 fn format_report_line(tick_index: usize, report: &SchedulerRunReport) -> String {
     let initial_used_bytes = report.initial_usage.as_ref().map(|usage| usage.used_bytes);
     let final_used_bytes = report.final_usage.as_ref().map(|usage| usage.used_bytes);
-    let reclaimed_bytes = match (initial_used_bytes, final_used_bytes) {
+    let observed_reclaimed_bytes = match (initial_used_bytes, final_used_bytes) {
         (Some(initial_used_bytes), Some(final_used_bytes)) => {
             Some(initial_used_bytes.saturating_sub(final_used_bytes))
         }
         _ => None,
+    };
+    let (reclaimed_bytes, reclaimed_source) = match observed_reclaimed_bytes {
+        Some(0) if report.reclaimed_estimated_bytes > 0 => {
+            (Some(report.reclaimed_estimated_bytes), "estimated")
+        }
+        Some(value) => (Some(value), "observed"),
+        None if report.reclaimed_estimated_bytes > 0 => {
+            (Some(report.reclaimed_estimated_bytes), "estimated")
+        }
+        None => (None, "unknown"),
     };
     let usage_percent_before = report
         .initial_usage
@@ -112,7 +137,7 @@ fn format_report_line(tick_index: usize, report: &SchedulerRunReport) -> String 
         .and_then(|usage| usage.percent_used());
 
     format!(
-        "tick={} backend={:?} dry_run={} cleanup_started={} stop_reason={:?} actions_planned={} actions_completed={} action_failures={} skipped_candidates={} initial_used_bytes={} final_used_bytes={} reclaimed_bytes={} usage_percent_before={} usage_percent_after={}",
+        "tick={} backend={:?} dry_run={} cleanup_started={} stop_reason={:?} actions_planned={} actions_completed={} action_failures={} skipped_candidates={} initial_used_bytes={} final_used_bytes={} reclaimed_bytes={} reclaimed_source={} usage_percent_before={} usage_percent_after={}",
         tick_index,
         report.backend,
         report.dry_run,
@@ -122,17 +147,18 @@ fn format_report_line(tick_index: usize, report: &SchedulerRunReport) -> String 
         report.actions_completed,
         report.action_failures,
         report.skipped_candidates,
-        format_optional_u64(initial_used_bytes),
-        format_optional_u64(final_used_bytes),
-        format_optional_u64(reclaimed_bytes),
+        format_optional_bytes(initial_used_bytes),
+        format_optional_bytes(final_used_bytes),
+        format_optional_bytes(reclaimed_bytes),
+        reclaimed_source,
         format_optional_u8(usage_percent_before),
         format_optional_u8(usage_percent_after)
     )
 }
 
-fn format_optional_u64(value: Option<u64>) -> String {
+fn format_optional_bytes(value: Option<u64>) -> String {
     value
-        .map(|value| value.to_string())
+        .map(format_bytes_human)
         .unwrap_or_else(|| "unknown".to_string())
 }
 
@@ -140,6 +166,22 @@ fn format_optional_u8(value: Option<u8>) -> String {
     value
         .map(|value| value.to_string())
         .unwrap_or_else(|| "unknown".to_string())
+}
+
+fn format_bytes_human(bytes: u64) -> String {
+    const UNITS: [&str; 6] = ["B", "KB", "MB", "GB", "TB", "PB"];
+    if bytes < 1024 {
+        return format!("{bytes} B");
+    }
+
+    let mut value = bytes as f64;
+    let mut unit_index = 0usize;
+    while value >= 1024.0 && unit_index < UNITS.len() - 1 {
+        value /= 1024.0;
+        unit_index += 1;
+    }
+
+    format!("{value:.2} {}", UNITS[unit_index])
 }
 
 fn to_cleanup_config(config: &Config) -> CleanupConfig {
@@ -267,8 +309,12 @@ fn print_usage() {
 
 #[cfg(test)]
 mod tests {
-    use super::{format_report_line, parse_args, select_backend_name, CliOptions, DEFAULT_CONFIG_PATH};
-    use prune_guard::{BackendKind, Config, SchedulerRunReport, SchedulerStopReason, UsageSnapshot};
+    use super::{
+        format_report_line, parse_args, select_backend_name, CliOptions, DEFAULT_CONFIG_PATH,
+    };
+    use prune_guard::{
+        BackendKind, Config, SchedulerRunReport, SchedulerStopReason, UsageSnapshot,
+    };
 
     #[test]
     fn parse_args_uses_safe_defaults() {
@@ -337,6 +383,7 @@ mod tests {
             iterations: 1,
             actions_planned: 2,
             actions_completed: 2,
+            reclaimed_estimated_bytes: 20,
             action_failures: 0,
             skipped_candidates: 3,
             initial_usage: Some(usage(90, 100)),
@@ -347,16 +394,20 @@ mod tests {
 
         let line = format_report_line(1, &report);
         assert!(
-            line.contains("initial_used_bytes=90"),
+            line.contains("initial_used_bytes=90 B"),
             "line should include initial_used_bytes: {line}"
         );
         assert!(
-            line.contains("final_used_bytes=70"),
+            line.contains("final_used_bytes=70 B"),
             "line should include final_used_bytes: {line}"
         );
         assert!(
-            line.contains("reclaimed_bytes=20"),
+            line.contains("reclaimed_bytes=20 B"),
             "line should include reclaimed_bytes: {line}"
+        );
+        assert!(
+            line.contains("reclaimed_source=observed"),
+            "line should include observed reclaim source: {line}"
         );
         assert!(
             line.contains("usage_percent_before=90"),
@@ -377,6 +428,7 @@ mod tests {
             iterations: 0,
             actions_planned: 0,
             actions_completed: 0,
+            reclaimed_estimated_bytes: 0,
             action_failures: 0,
             skipped_candidates: 0,
             initial_usage: None,
@@ -389,6 +441,39 @@ mod tests {
         assert!(
             line.contains("reclaimed_bytes=unknown"),
             "line should include unknown reclaimed stats: {line}"
+        );
+        assert!(
+            line.contains("reclaimed_source=unknown"),
+            "line should include unknown reclaim source: {line}"
+        );
+    }
+
+    #[test]
+    fn report_line_falls_back_to_estimated_reclaim_when_observed_delta_is_zero() {
+        let report = SchedulerRunReport {
+            backend: BackendKind::Docker,
+            dry_run: false,
+            cleanup_started: true,
+            iterations: 1,
+            actions_planned: 3,
+            actions_completed: 3,
+            reclaimed_estimated_bytes: 314572800,
+            action_failures: 0,
+            skipped_candidates: 0,
+            initial_usage: Some(usage(90, 100)),
+            final_usage: Some(usage(90, 100)),
+            stop_reason: SchedulerStopReason::NoActionableCandidates,
+            last_error: None,
+        };
+
+        let line = format_report_line(1, &report);
+        assert!(
+            line.contains("reclaimed_bytes=300.00 MB"),
+            "line should include estimated reclaimed bytes: {line}"
+        );
+        assert!(
+            line.contains("reclaimed_source=estimated"),
+            "line should include estimated reclaim source: {line}"
         );
     }
 

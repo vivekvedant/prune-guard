@@ -21,8 +21,8 @@ This feature makes the CircleCI build matrix, packaging rules, artifact integrit
 - Linux `.deb` package includes:
   - `/usr/bin/prune-guard` daemon executable
   - `/etc/prune-guard/prune-guard.toml` config template
-  - `/lib/systemd/system/prune-guard.service` oneshot service unit
-  - `/lib/systemd/system/prune-guard.timer` recurring timer unit
+  - `/lib/systemd/system/prune-guard.service` long-running daemon service unit
+  - `/lib/systemd/system/prune-guard.timer` bootstrapping timer unit
 - Linux `.deb` packaging must exclude the recursive `target/release` build tree to keep artifacts small, deterministic, and resilient in CI.
 - macOS artifacts remain packaged as archive files with stable filenames.
 - Packaging must keep the release payload minimal and deterministic.

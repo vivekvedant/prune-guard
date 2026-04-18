@@ -3,7 +3,6 @@ Description=Prune Guard Cleanup Daemon Timer
 
 [Timer]
 OnBootSec=2min
-OnUnitActiveSec=15min
 AccuracySec=1min
 Persistent=true
 Unit=prune-guard.service

@@ -19,6 +19,7 @@ This folder stores standalone flowchart documents for runtime, safety, and workf
 - `observability-security-portability.md`: structured logging, preflight security, and portability flowcharts
 - `release-readiness.md`: documentation alignment, release runbook, and PR checklist flowcharts
 - `cross-platform-build-distribution.md`: cross-platform build matrix, artifact packaging, checksums, and fail-closed release gate flowcharts
+- `docker-storage-growth-helper.md`: local `test_bin.sh` loop that intentionally increases Docker storage with fail-closed preflight checks
 
 ## Rules
 

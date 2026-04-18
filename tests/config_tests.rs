@@ -22,6 +22,8 @@ fn default_config_is_safety_first() {
     assert!(cfg.protected_images.is_empty());
     assert!(cfg.protected_volumes.is_empty());
     assert!(cfg.protected_labels.is_empty());
+    assert_eq!(cfg.docker_host, None);
+    assert_eq!(cfg.docker_context, None);
 }
 
 #[test]
@@ -74,6 +76,9 @@ fn from_reader_supports_sectioned_toml() {
             dry_run = false
             allow_missing_image_labels = true
             protected_images = ["postgres:16"]
+
+            [docker]
+            context = "desktop-linux"
         "#,
     ))
     .expect("sectioned TOML should parse");
@@ -84,6 +89,7 @@ fn from_reader_supports_sectioned_toml() {
     assert!(!cfg.dry_run);
     assert!(cfg.allow_missing_image_labels);
     assert_eq!(cfg.protected_images, vec!["postgres:16"]);
+    assert_eq!(cfg.docker_context.as_deref(), Some("desktop-linux"));
 }
 
 #[test]
@@ -125,6 +131,41 @@ fn invalid_threshold_relationship_is_rejected() {
     assert!(
         message.contains("target_watermark_percent must be lower than high_watermark_percent"),
         "unexpected error message: {message}"
+    );
+}
+
+#[test]
+fn parse_supports_docker_host_override() {
+    let cfg = Config::parse_str(
+        r#"
+            [docker]
+            host = "unix:///home/vivek/.docker/desktop/docker.sock"
+        "#,
+    )
+    .expect("docker.host should parse");
+
+    assert_eq!(
+        cfg.docker_host.as_deref(),
+        Some("unix:///home/vivek/.docker/desktop/docker.sock")
+    );
+    assert_eq!(cfg.docker_context, None);
+}
+
+#[test]
+fn parse_rejects_ambiguous_docker_host_and_context() {
+    let err = Config::parse_str(
+        r#"
+            [docker]
+            host = "unix:///var/run/docker.sock"
+            context = "desktop-linux"
+        "#,
+    )
+    .expect_err("host and context together must fail closed");
+
+    assert!(
+        err.to_string()
+            .contains("docker.host and docker.context cannot both be set"),
+        "unexpected error: {err}"
     );
 }
 

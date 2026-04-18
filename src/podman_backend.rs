@@ -1,9 +1,9 @@
 use crate::backend::{CandidateDiscoverer, ExecutionContract, HealthCheck, UsageCollector};
+use crate::docker_backend::{CommandRunner, OsCommandRunner};
 use crate::domain::{
     BackendKind, CandidateArtifact, CandidateDiscoveryRequest, CandidateDiscoveryResponse,
     ExecutionMode, ExecutionRequest, ExecutionResponse, HealthReport, ResourceKind, UsageSnapshot,
 };
-use crate::docker_backend::{CommandRunner, OsCommandRunner};
 use crate::error::{CleanupError, Result};
 use std::collections::{BTreeSet, HashSet};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -51,7 +51,9 @@ impl<R: CommandRunner> PodmanBackend<R> {
             .run("df", &["-B1", "--output=used,size", root_dir])
     }
 
-    fn collect_container_metadata_raw(&self) -> std::result::Result<Vec<ContainerMetadata>, String> {
+    fn collect_container_metadata_raw(
+        &self,
+    ) -> std::result::Result<Vec<ContainerMetadata>, String> {
         let container_ids = self
             .run_podman(&["ps", "-a", "-q", "--no-trunc"])
             .map_err(|message| format!("failed listing containers: {message}"))?;
@@ -104,12 +106,12 @@ impl<R: CommandRunner> PodmanBackend<R> {
     }
 
     fn ensure_image_not_referenced(&self, image_id: &str) -> Result<()> {
-        let output =
-            self.run_podman(&["ps", "-a", "--format", "{{.ImageID}}"])
-                .map_err(|message| CleanupError::ExecutionFailed {
-                    backend: BackendKind::Podman,
-                    message: format!("failed to discover image references: {message}"),
-                })?;
+        let output = self
+            .run_podman(&["ps", "-a", "--format", "{{.ImageID}}"])
+            .map_err(|message| CleanupError::ExecutionFailed {
+                backend: BackendKind::Podman,
+                message: format!("failed to discover image references: {message}"),
+            })?;
 
         let normalized_target = normalize_image_id(image_id);
         let referenced = non_empty_lines(&output)
@@ -151,6 +153,13 @@ impl<R: CommandRunner> PodmanBackend<R> {
             ResourceKind::Container => self.run_podman(&["container", "rm", identifier]),
             ResourceKind::Image => self.run_podman(&["image", "rm", identifier]),
             ResourceKind::Volume => self.run_podman(&["volume", "rm", identifier]),
+            ResourceKind::BuildCache => {
+                return Err(CleanupError::ExecutionFailed {
+                    backend: BackendKind::Podman,
+                    message: "build cache cleanup is currently unsupported for podman backend"
+                        .to_string(),
+                });
+            }
             ResourceKind::Unknown(kind) => {
                 return Err(CleanupError::ExecutionFailed {
                     backend: BackendKind::Podman,
@@ -159,10 +168,12 @@ impl<R: CommandRunner> PodmanBackend<R> {
             }
         };
 
-        command_error.map(|_| ()).map_err(|message| CleanupError::ExecutionFailed {
-            backend: BackendKind::Podman,
-            message: format!("delete command failed for `{identifier}`: {message}"),
-        })
+        command_error
+            .map(|_| ())
+            .map_err(|message| CleanupError::ExecutionFailed {
+                backend: BackendKind::Podman,
+                message: format!("delete command failed for `{identifier}`: {message}"),
+            })
     }
 }
 
@@ -212,19 +223,18 @@ impl<R: CommandRunner> UsageCollector for PodmanBackend<R> {
             });
         }
 
-        let df_output = self
-            .run_df(root_dir)
-            .map_err(|message| CleanupError::UsageCollectionFailed {
-                backend: BackendKind::Podman,
-                message: format!("failed reading disk usage for `{root_dir}`: {message}"),
-            })?;
+        let df_output =
+            self.run_df(root_dir)
+                .map_err(|message| CleanupError::UsageCollectionFailed {
+                    backend: BackendKind::Podman,
+                    message: format!("failed reading disk usage for `{root_dir}`: {message}"),
+                })?;
 
-        let (used_bytes, total_bytes) = parse_df_usage(&df_output).ok_or_else(|| {
-            CleanupError::UsageCollectionFailed {
+        let (used_bytes, total_bytes) =
+            parse_df_usage(&df_output).ok_or_else(|| CleanupError::UsageCollectionFailed {
                 backend: BackendKind::Podman,
                 message: "could not parse df usage output".to_string(),
-            }
-        })?;
+            })?;
 
         let used_percent = if total_bytes > 0 {
             Some(((used_bytes.saturating_mul(100)) / total_bytes) as u8)
@@ -291,7 +301,13 @@ impl<R: CommandRunner> CandidateDiscoverer for PodmanBackend<R> {
 
         for image_id in non_empty_lines(&image_ids) {
             let inspect = self
-                .run_podman(&["image", "inspect", "--format", IMAGE_INSPECT_TEMPLATE, image_id])
+                .run_podman(&[
+                    "image",
+                    "inspect",
+                    "--format",
+                    IMAGE_INSPECT_TEMPLATE,
+                    image_id,
+                ])
                 .map_err(|message| CleanupError::CandidateDiscoveryFailed {
                     backend: BackendKind::Podman,
                     message: format!("failed to inspect image `{image_id}`: {message}"),
@@ -308,12 +324,18 @@ impl<R: CommandRunner> CandidateDiscoverer for PodmanBackend<R> {
             })?;
 
         for volume_name in non_empty_lines(&volume_names) {
-            let inspect =
-                self.run_podman(&["volume", "inspect", "--format", VOLUME_INSPECT_TEMPLATE, volume_name])
-                    .map_err(|message| CleanupError::CandidateDiscoveryFailed {
-                        backend: BackendKind::Podman,
-                        message: format!("failed to inspect volume `{volume_name}`: {message}"),
-                    })?;
+            let inspect = self
+                .run_podman(&[
+                    "volume",
+                    "inspect",
+                    "--format",
+                    VOLUME_INSPECT_TEMPLATE,
+                    volume_name,
+                ])
+                .map_err(|message| CleanupError::CandidateDiscoveryFailed {
+                    backend: BackendKind::Podman,
+                    message: format!("failed to inspect volume `{volume_name}`: {message}"),
+                })?;
 
             candidates.push(parse_volume_candidate(
                 &inspect,
@@ -363,9 +385,22 @@ impl<R: CommandRunner> ExecutionContract for PodmanBackend<R> {
         }
 
         match action.candidate.resource_kind {
-            ResourceKind::Container => self.ensure_container_not_running(&action.candidate.identifier)?,
-            ResourceKind::Image => self.ensure_image_not_referenced(&action.candidate.identifier)?,
-            ResourceKind::Volume => self.ensure_volume_not_attached(&action.candidate.identifier)?,
+            ResourceKind::Container => {
+                self.ensure_container_not_running(&action.candidate.identifier)?
+            }
+            ResourceKind::Image => {
+                self.ensure_image_not_referenced(&action.candidate.identifier)?
+            }
+            ResourceKind::Volume => {
+                self.ensure_volume_not_attached(&action.candidate.identifier)?
+            }
+            ResourceKind::BuildCache => {
+                return Err(CleanupError::ExecutionFailed {
+                    backend: BackendKind::Podman,
+                    message: "build cache cleanup is currently unsupported for podman backend"
+                        .to_string(),
+                });
+            }
             ResourceKind::Unknown(ref kind) => {
                 return Err(CleanupError::ExecutionFailed {
                     backend: BackendKind::Podman,
@@ -374,7 +409,10 @@ impl<R: CommandRunner> ExecutionContract for PodmanBackend<R> {
             }
         }
 
-        self.delete_resource(&action.candidate.resource_kind, &action.candidate.identifier)?;
+        self.delete_resource(
+            &action.candidate.resource_kind,
+            &action.candidate.identifier,
+        )?;
 
         Ok(ExecutionResponse {
             backend: BackendKind::Podman,
@@ -401,8 +439,10 @@ struct ContainerMetadata {
 impl ContainerMetadata {
     fn into_candidate(self, now: SystemTime) -> CandidateArtifact {
         let age_days = self.age_days;
-        let metadata_complete =
-            !self.id.is_empty() && self.running.is_some() && self.size_bytes.is_some() && age_days.is_some();
+        let metadata_complete = !self.id.is_empty()
+            && self.running.is_some()
+            && self.size_bytes.is_some()
+            && age_days.is_some();
         CandidateArtifact {
             backend: BackendKind::Podman,
             resource_kind: ResourceKind::Container,
@@ -612,7 +652,8 @@ fn days_from_civil(year: i32, month: u32, day: u32) -> Option<u64> {
     };
     let year_of_era = adjusted_year - era * 400;
     let month_of_year = month as i32;
-    let day_of_year = (153 * (month_of_year + if month > 2 { -3 } else { 9 }) + 2) / 5 + day as i32 - 1;
+    let day_of_year =
+        (153 * (month_of_year + if month > 2 { -3 } else { 9 }) + 2) / 5 + day as i32 - 1;
     let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
     let days = era * 146_097 + day_of_era - 719_468;
     u64::try_from(days).ok()

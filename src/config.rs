@@ -43,6 +43,10 @@ pub struct Config {
     pub protected_volumes: Vec<String>,
     /// Labels that imply protection.
     pub protected_labels: Vec<String>,
+    /// Optional Docker daemon endpoint override used for all docker CLI calls.
+    pub docker_host: Option<String>,
+    /// Optional Docker CLI context override used for all docker CLI calls.
+    pub docker_context: Option<String>,
 }
 
 impl Default for Config {
@@ -59,6 +63,8 @@ impl Default for Config {
             protected_images: Vec::new(),
             protected_volumes: Vec::new(),
             protected_labels: Vec::new(),
+            docker_host: None,
+            docker_context: None,
         }
     }
 }
@@ -175,6 +181,18 @@ impl Config {
             config.protected_labels.clone(),
             "protected_labels",
         )?;
+        config.docker_host = take_optional_string(
+            &entries,
+            &["docker_host", "docker.host"],
+            config.docker_host.clone(),
+            "docker_host",
+        )?;
+        config.docker_context = take_optional_string(
+            &entries,
+            &["docker_context", "docker.context"],
+            config.docker_context.clone(),
+            "docker_context",
+        )?;
 
         ensure_no_unknown_keys(&entries)?;
         config.validate()?;
@@ -202,6 +220,21 @@ impl Config {
         if self.target_watermark_percent >= self.high_watermark_percent {
             return Err(ConfigError::validation(
                 "target_watermark_percent must be lower than high_watermark_percent",
+            ));
+        }
+        if let Some(host) = &self.docker_host {
+            if host.trim().is_empty() {
+                return Err(ConfigError::validation("docker.host cannot be empty"));
+            }
+        }
+        if let Some(context) = &self.docker_context {
+            if context.trim().is_empty() {
+                return Err(ConfigError::validation("docker.context cannot be empty"));
+            }
+        }
+        if self.docker_host.is_some() && self.docker_context.is_some() {
+            return Err(ConfigError::validation(
+                "docker.host and docker.context cannot both be set",
             ));
         }
         Ok(())
@@ -534,6 +567,10 @@ fn is_known_key(key: &str) -> bool {
             "protected_labels",
             "allowlists.protected_labels",
             "safety.protected_labels",
+            "docker_host",
+            "docker.host",
+            "docker_context",
+            "docker.context",
         ],
     )
 }
@@ -610,6 +647,21 @@ fn take_string_array(
         }
         Some(_) => Err(ConfigError::validation(format!(
             "{field_name} must be an array"
+        ))),
+        None => Ok(default),
+    }
+}
+
+fn take_optional_string(
+    entries: &BTreeMap<String, TomlValue>,
+    aliases: &[&str],
+    default: Option<String>,
+    field_name: &str,
+) -> Result<Option<String>, ConfigError> {
+    match find_single(entries, aliases, field_name)? {
+        Some(TomlValue::String(value)) => Ok(Some(value.clone())),
+        Some(_) => Err(ConfigError::validation(format!(
+            "{field_name} must be a string"
         ))),
         None => Ok(default),
     }

@@ -155,9 +155,12 @@ cat > "${debian_dir}/postinst" <<'EOF'
 set -e
 if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
   systemctl daemon-reload || true
-  systemctl disable prune-guard.service || true
-  systemctl enable prune-guard.timer || true
-  systemctl start prune-guard.timer || true
+  # Service drives recurring interval from /etc/prune-guard/prune-guard.toml.
+  # Timer is bootstrap-only and should not define cadence.
+  systemctl stop prune-guard.timer || true
+  systemctl disable prune-guard.timer || true
+  systemctl enable prune-guard.service || true
+  systemctl restart prune-guard.service || true
 fi
 exit 0
 EOF

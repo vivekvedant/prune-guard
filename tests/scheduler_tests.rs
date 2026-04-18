@@ -330,8 +330,10 @@ impl CandidateDiscoverer for MockSchedulerBackend {
 
         let mut candidate = Self::sample_candidate(&format!("img-{call_idx}"));
         if self.planner_mode == PlannerMode::ZeroActions {
-            // Fail-closed planner behavior: unknown reclaim size must not produce delete action.
+            // Keep this mode explicitly non-actionable even with unknown-size fallback.
             candidate.size_bytes = None;
+            candidate.metadata_complete = false;
+            candidate.metadata_ambiguous = true;
         }
 
         Ok(CandidateDiscoveryResponse {

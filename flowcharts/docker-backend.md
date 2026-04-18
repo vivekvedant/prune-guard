@@ -2,23 +2,37 @@
 
 This document captures Docker adapter control flow and safety guards.
 
+## Command Routing
+
+```mermaid
+flowchart TD
+    A[Load docker.host / docker.context from config] --> B{Exactly one set?}
+    B -- No, both set --> C[Config validation fails closed]
+    B -- Yes or none --> D[Build docker CLI global args]
+    D --> E[Prefix every docker command with --host or --context when configured]
+```
+
 ## Discovery Safety Flow
 
 ```mermaid
 flowchart TD
-    A[Collect Docker containers/images/volumes] --> B[Inspect image with labels template]
+    A[Collect Docker containers/images/volumes/build-cache] --> A1[Load volume sizes via docker system df -v]
+    A1 --> B[Inspect image with labels template]
     B --> C{Labels inspect hit known missing-labels template error?}
     C -- Yes --> D[Retry image inspect with labels-free template]
     C -- No --> E[Use primary inspect output]
-    D --> F{allow_missing_image_labels enabled?}
-    F -- No --> F1[Mark labels unknown -> metadata_complete=false]
-    F -- Yes --> F2[Inspect json labels and require exact `null`]
-    F2 --> F3{labels json exactly null?}
-    F3 -- No --> F1
-    F3 -- Yes --> F4[Treat labels as safe empty set]
+    D --> F{protected_labels configured?}
+    F -- No --> F2[Proceed without label-based safety requirement]
+    F -- Yes --> F3{allow_missing_image_labels enabled?}
+    F3 -- No --> F1[Mark labels unknown -> metadata_complete=false]
+    F3 -- Yes --> F4[Inspect json labels and require exact `null`]
+    F4 --> F5{labels json exactly null?}
+    F5 -- No --> F1
+    F5 -- Yes --> F6[Treat labels as safe empty set]
     E --> G[Build candidate metadata]
     F1 --> G
-    F4 --> G
+    F2 --> G
+    F6 --> G
     G --> H{Metadata complete and unambiguous?}
     H -- No --> I[Mark metadata_ambiguous / metadata_complete=false]
     H -- Yes --> J[Mark candidate with in_use and referenced flags]
@@ -42,13 +56,21 @@ flowchart TD
     D -- Volume --> J{Volume attached now?}
     J -- Yes --> Z
     J -- No --> W[Run docker volume rm]
+    D -- BuildCache --> L{Build cache candidate id valid?}
+    L -- No --> Z
+    L -- Yes --> M[Run docker builder prune -f with optional until filter and prune-budget flags]
     X --> K[Return executed=true]
     Y --> K
     W --> K
+    M --> K
+    N[Guard inspect says No such container] --> O[Treat as stale and continue guard evaluation]
+    O --> H
+    O --> J
+    P[Delete says No such target] --> K
 ```
 
 Notes:
 
 - Safety checks are re-run immediately before delete to prevent stale-plan unsafe removals.
-- Any uncertainty in safety checks stops execution rather than proceeding optimistically.
-- Image reference check uses `docker ps --format {{.ImageID}}` first; when unsupported, it falls back to container inspect per-id and fails closed on ambiguous output.
+- Explicitly missing resources are treated as idempotent no-ops; ambiguous safety metadata still fails closed.
+- Image reference guards use `docker ps --format {{.ImageID}}` first, with per-container inspect fallback when that template field is unsupported.

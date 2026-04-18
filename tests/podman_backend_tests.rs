@@ -52,7 +52,10 @@ fn podman_health_check_degrades_gracefully_when_backend_is_unavailable() {
 #[test]
 fn podman_usage_collection_reads_store_graph_root_usage() {
     let runner = FakeRunner::new(vec![
-        ok("podman|info|--format|{{.Store.GraphRoot}}", "/var/lib/containers/storage\n"),
+        ok(
+            "podman|info|--format|{{.Store.GraphRoot}}",
+            "/var/lib/containers/storage\n",
+        ),
         ok(
             "df|-B1|--output=used,size|/var/lib/containers/storage",
             "   Used       Size\n500000000 2000000000\n",
@@ -186,7 +189,11 @@ fn execution_blocks_running_container_deletion() {
     let backend = PodmanBackend::with_runner(runner.clone());
 
     let error = backend
-        .execute(execution_request("ctr-running", ResourceKind::Container, ExecutionMode::RealRun))
+        .execute(execution_request(
+            "ctr-running",
+            ResourceKind::Container,
+            ExecutionMode::RealRun,
+        ))
         .expect_err("running container must never be deleted");
 
     match error {
@@ -214,7 +221,11 @@ fn execution_blocks_referenced_image_deletion() {
     let backend = PodmanBackend::with_runner(runner.clone());
 
     let error = backend
-        .execute(execution_request("img-a", ResourceKind::Image, ExecutionMode::RealRun))
+        .execute(execution_request(
+            "img-a",
+            ResourceKind::Image,
+            ExecutionMode::RealRun,
+        ))
         .expect_err("referenced image must never be deleted");
 
     match error {
@@ -225,7 +236,10 @@ fn execution_blocks_referenced_image_deletion() {
     }
 
     assert!(
-        !runner.calls().iter().any(|call| call == "podman|image|rm|img-a"),
+        !runner
+            .calls()
+            .iter()
+            .any(|call| call == "podman|image|rm|img-a"),
         "delete command must not run for referenced images"
     );
 }
@@ -242,7 +256,11 @@ fn execution_blocks_attached_volume_deletion() {
     let backend = PodmanBackend::with_runner(runner.clone());
 
     let error = backend
-        .execute(execution_request("vol-used", ResourceKind::Volume, ExecutionMode::RealRun))
+        .execute(execution_request(
+            "vol-used",
+            ResourceKind::Volume,
+            ExecutionMode::RealRun,
+        ))
         .expect_err("attached volume must never be deleted");
 
     match error {
@@ -310,7 +328,10 @@ impl FakeRunner {
 impl CommandRunner for FakeRunner {
     fn run(&self, program: &str, args: &[&str]) -> Result<String, String> {
         let key = command_key(program, args);
-        self.calls.lock().expect("calls lock poisoned").push(key.clone());
+        self.calls
+            .lock()
+            .expect("calls lock poisoned")
+            .push(key.clone());
 
         let mut queue = self
             .expectations
