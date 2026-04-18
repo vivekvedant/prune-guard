@@ -20,8 +20,8 @@ It does not perform real cleanup against Docker/Podman yet. It defines the share
 - `src/main.rs`: daemon entrypoint (config loading, backend selection, scheduler loop)
 - `src/config.rs`: `Config` model, TOML subset parser, validation rules
 - `config/prune-guard.toml`: install template config (deploy to `/etc/prune-guard/prune-guard.toml`)
-- `packaging/systemd/prune-guard.service`: oneshot systemd unit for one scheduler tick execution
-- `packaging/systemd/prune-guard.timer`: recurring timer that triggers the oneshot service
+- `packaging/systemd/prune-guard.service`: long-lived systemd daemon unit that runs scheduler loop
+- `packaging/systemd/prune-guard.timer`: bootstrap timer that starts daemon shortly after boot
 - `src/domain.rs`: runtime-safe domain structs/enums
 - `src/backend.rs`: backend pipeline contracts
 - `src/error.rs`: shared error enum for all stages

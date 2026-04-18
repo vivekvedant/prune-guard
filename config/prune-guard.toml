@@ -21,6 +21,12 @@ max_delete_per_run_gb = 10
 [backends]
 enabled_backends = ["docker"]
 
+[docker]
+# Optional Docker daemon selection for service environments.
+# Set exactly one of the following when the daemon must target a non-default Docker endpoint.
+# host = "unix:///home/<user>/.docker/desktop/docker.sock"
+# context = "desktop-linux"
+
 [allowlists]
 protected_images = []
 protected_volumes = []

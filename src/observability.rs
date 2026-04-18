@@ -5,7 +5,14 @@ use std::sync::Mutex;
 
 /// Stable schema version for structured log records.
 pub const LOG_SCHEMA_VERSION: &str = "1.0";
-const CORE_LOG_FIELDS: [&str; 6] = ["schema_version", "level", "event_type", "reason", "backend", "action"];
+const CORE_LOG_FIELDS: [&str; 6] = [
+    "schema_version",
+    "level",
+    "event_type",
+    "reason",
+    "backend",
+    "action",
+];
 
 /// Log severity used by structured log records.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -99,7 +106,11 @@ impl StructuredLogRecord {
         let map = self.to_kv_map();
         let mut parts = Vec::with_capacity(map.len());
         for (key, value) in map {
-            parts.push(format!("\"{}\":\"{}\"", escape_json(&key), escape_json(&value)));
+            parts.push(format!(
+                "\"{}\":\"{}\"",
+                escape_json(&key),
+                escape_json(&value)
+            ));
         }
         format!("{{{}}}", parts.join(","))
     }
@@ -209,7 +220,10 @@ impl MetricsRecorder for InMemoryMetricsRecorder {
 /// Emits scheduler-level counters for per-run summaries.
 pub fn emit_scheduler_metrics<R: MetricsRecorder>(recorder: &R, report: &SchedulerRunReport) {
     recorder.increment_counter("scheduler_runs_total", 1);
-    recorder.increment_counter("scheduler_actions_planned_total", report.actions_planned as u64);
+    recorder.increment_counter(
+        "scheduler_actions_planned_total",
+        report.actions_planned as u64,
+    );
     recorder.increment_counter(
         "scheduler_actions_completed_total",
         report.actions_completed as u64,
@@ -329,7 +343,9 @@ pub fn preflight_execution(
     }
 
     RuntimePreflightDecision {
-        enforce_dry_run: requested_dry_run || !portability.supported || !least_privilege.least_privilege_ok,
+        enforce_dry_run: requested_dry_run
+            || !portability.supported
+            || !least_privilege.least_privilege_ok,
         reasons,
         portability_supported: portability.supported,
         least_privilege_ok: least_privilege.least_privilege_ok,
@@ -359,7 +375,9 @@ fn is_sensitive_key(key: &str) -> bool {
         "authorization",
         "auth",
     ];
-    SENSITIVE_KEYWORDS.iter().any(|keyword| key.contains(keyword))
+    SENSITIVE_KEYWORDS
+        .iter()
+        .any(|keyword| key.contains(keyword))
 }
 
 fn escape_json(value: &str) -> String {

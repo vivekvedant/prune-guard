@@ -21,7 +21,10 @@ fn list_markdown_files(root: &Path) -> Vec<PathBuf> {
 
         for entry in entries {
             let entry = entry.unwrap_or_else(|err| {
-                panic!("failed to inspect directory entry in {}: {err}", dir.display())
+                panic!(
+                    "failed to inspect directory entry in {}: {err}",
+                    dir.display()
+                )
             });
             let path = entry.path();
             if path.is_dir() {
@@ -37,7 +40,9 @@ fn list_markdown_files(root: &Path) -> Vec<PathBuf> {
 }
 
 fn contains_case_insensitive(haystack: &str, needle: &str) -> bool {
-    haystack.to_ascii_lowercase().contains(&needle.to_ascii_lowercase())
+    haystack
+        .to_ascii_lowercase()
+        .contains(&needle.to_ascii_lowercase())
 }
 
 fn markdown_files_matching(root: &Path, folder: &str, needle: &str) -> Vec<PathBuf> {

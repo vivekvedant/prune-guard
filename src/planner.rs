@@ -1,6 +1,6 @@
 use crate::domain::{
     ActionPlan, ActionPlanningRequest, CleanupActionKind, CleanupConfig, PlannedAction,
-    SkippedCandidate,
+    ResourceKind, SkippedCandidate,
 };
 use crate::policy::PolicyEngine;
 
@@ -102,6 +102,24 @@ impl CleanupPlanner {
             };
 
             if size_bytes > remaining_delete_bytes {
+                if matches!(candidate.resource_kind, ResourceKind::BuildCache)
+                    && remaining_delete_bytes > 0
+                {
+                    // Build cache cleanup is chunkable across runs/ticks.
+                    // Plan a capped action so large cache sets can make bounded
+                    // progress without violating per-run delete budget.
+                    let mut candidate = candidate;
+                    candidate.size_bytes = Some(remaining_delete_bytes);
+                    actions.push(PlannedAction {
+                        candidate,
+                        kind: CleanupActionKind::Delete,
+                        dry_run: config.dry_run,
+                        reason: Some("policy_accepted_within_delete_cap".to_string()),
+                    });
+                    remaining_delete_bytes = 0;
+                    continue;
+                }
+
                 skipped.push(SkippedCandidate {
                     candidate,
                     reason: SKIPPED_REASON_DELETION_CAP_REACHED.to_string(),

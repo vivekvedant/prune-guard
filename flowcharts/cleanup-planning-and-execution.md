@@ -17,7 +17,10 @@ flowchart TD
     E1 -- Yes --> E2[Reserve full remaining delete budget]
     E2 --> G
     E -- Yes --> F{size_bytes <= remaining_delete_budget?}
-    F -- No --> R4[Skip: deletion_cap_reached]
+    F -- No --> F1{build-cache candidate and remaining budget > 0?}
+    F1 -- Yes --> F2[Cap action size to remaining budget]
+    F2 --> G
+    F1 -- No --> R4[Skip: deletion_cap_reached]
     F -- Yes --> G[Create PlannedAction Delete]
     G --> H[Subtract size from remaining budget]
 ```

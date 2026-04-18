@@ -151,7 +151,13 @@ pub trait BackendCycleRunner: Send + Sync {
 /// Adapter that binds `CleanupScheduler` to one concrete backend.
 pub struct SchedulerBackendRunner<B>
 where
-    B: HealthCheck + UsageCollector + CandidateDiscoverer + ExecutionContract + Send + Sync + 'static,
+    B: HealthCheck
+        + UsageCollector
+        + CandidateDiscoverer
+        + ExecutionContract
+        + Send
+        + Sync
+        + 'static,
 {
     scheduler: CleanupScheduler,
     backend: Arc<B>,
@@ -159,7 +165,13 @@ where
 
 impl<B> SchedulerBackendRunner<B>
 where
-    B: HealthCheck + UsageCollector + CandidateDiscoverer + ExecutionContract + Send + Sync + 'static,
+    B: HealthCheck
+        + UsageCollector
+        + CandidateDiscoverer
+        + ExecutionContract
+        + Send
+        + Sync
+        + 'static,
 {
     pub fn new(scheduler: CleanupScheduler, backend: Arc<B>) -> Self {
         Self { scheduler, backend }
@@ -168,7 +180,13 @@ where
 
 impl<B> BackendCycleRunner for SchedulerBackendRunner<B>
 where
-    B: HealthCheck + UsageCollector + CandidateDiscoverer + ExecutionContract + Send + Sync + 'static,
+    B: HealthCheck
+        + UsageCollector
+        + CandidateDiscoverer
+        + ExecutionContract
+        + Send
+        + Sync
+        + 'static,
 {
     fn backend_kind(&self) -> BackendKind {
         self.backend.backend_kind()
@@ -269,7 +287,10 @@ impl<S: RetrySleeper, L: SingleInstanceLock> ReliabilityCoordinator<S, L> {
         &self.retry_policy
     }
 
-    pub fn run_once(&self, backends: &[Arc<dyn BackendCycleRunner>]) -> Result<ReliabilityRunSummary> {
+    pub fn run_once(
+        &self,
+        backends: &[Arc<dyn BackendCycleRunner>],
+    ) -> Result<ReliabilityRunSummary> {
         let Some(_guard) = self.lock.try_acquire()? else {
             return Ok(ReliabilityRunSummary::lock_not_acquired());
         };
@@ -319,7 +340,9 @@ impl<S: RetrySleeper, L: SingleInstanceLock> ReliabilityCoordinator<S, L> {
                     last_error = report.last_error.clone();
                     last_report = Some(report);
                 }
-                Ok(report) => return BackendReliabilityReport::success(backend_kind, attempts, report),
+                Ok(report) => {
+                    return BackendReliabilityReport::success(backend_kind, attempts, report)
+                }
                 Err(error) => {
                     last_error = Some(error);
                     last_report = None;

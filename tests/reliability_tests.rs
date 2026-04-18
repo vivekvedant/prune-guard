@@ -167,7 +167,11 @@ fn single_instance_lock_prevents_concurrent_run() {
     assert!(!summary.lock_acquired);
     assert!(summary.no_op);
     assert!(summary.backend_reports.is_empty());
-    assert_eq!(runner.call_count(), 0, "backend must not run without the lock");
+    assert_eq!(
+        runner.call_count(),
+        0,
+        "backend must not run without the lock"
+    );
 }
 
 #[derive(Debug, Clone, Default)]
@@ -292,6 +296,7 @@ fn success_report(backend: BackendKind) -> SchedulerRunReport {
         iterations: 1,
         actions_planned: 1,
         actions_completed: 1,
+        reclaimed_estimated_bytes: 0,
         action_failures: 0,
         skipped_candidates: 0,
         initial_usage: Some(sample_usage()),
@@ -309,6 +314,7 @@ fn retryable_failure_report(backend: BackendKind, message: &str) -> SchedulerRun
         iterations: 1,
         actions_planned: 1,
         actions_completed: 0,
+        reclaimed_estimated_bytes: 0,
         action_failures: 1,
         skipped_candidates: 0,
         initial_usage: Some(sample_usage()),
@@ -334,4 +340,3 @@ fn sample_usage() -> UsageSnapshot {
         observed_at: None,
     }
 }
-

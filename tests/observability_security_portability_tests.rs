@@ -3,19 +3,34 @@ use prune_guard::observability::{
     redact_value, validate_supported_os, AuditableRunSummary, InMemoryMetricsRecorder, LogLevel,
     StructuredLogRecord, LOG_SCHEMA_VERSION,
 };
-use prune_guard::{BackendKind, CleanupError, SchedulerRunReport, SchedulerStopReason, UsageSnapshot};
+use prune_guard::{
+    BackendKind, CleanupError, SchedulerRunReport, SchedulerStopReason, UsageSnapshot,
+};
 
 #[test]
 fn structured_log_record_exposes_required_schema_fields() {
-    let record = StructuredLogRecord::new(LogLevel::Info, "candidate_skipped", "candidate is protected")
-        .with_backend(BackendKind::Docker)
-        .with_detail("candidate_id", "sha256:abc")
-        .with_detail("auth_token", "secret-token");
+    let record = StructuredLogRecord::new(
+        LogLevel::Info,
+        "candidate_skipped",
+        "candidate is protected",
+    )
+    .with_backend(BackendKind::Docker)
+    .with_detail("candidate_id", "sha256:abc")
+    .with_detail("auth_token", "secret-token");
 
     let map = record.to_kv_map();
-    assert_eq!(map.get("schema_version"), Some(&LOG_SCHEMA_VERSION.to_string()));
-    assert_eq!(map.get("event_type"), Some(&"candidate_skipped".to_string()));
-    assert_eq!(map.get("reason"), Some(&"candidate is protected".to_string()));
+    assert_eq!(
+        map.get("schema_version"),
+        Some(&LOG_SCHEMA_VERSION.to_string())
+    );
+    assert_eq!(
+        map.get("event_type"),
+        Some(&"candidate_skipped".to_string())
+    );
+    assert_eq!(
+        map.get("reason"),
+        Some(&"candidate is protected".to_string())
+    );
     assert_eq!(map.get("backend"), Some(&"docker".to_string()));
     assert_eq!(map.get("candidate_id"), Some(&"sha256:abc".to_string()));
     assert_eq!(map.get("auth_token"), Some(&"[REDACTED]".to_string()));
@@ -31,7 +46,10 @@ fn structured_log_record_does_not_allow_detail_overrides_of_core_fields() {
 
     let map = record.to_kv_map();
     assert_eq!(map.get("reason"), Some(&"canonical-reason".to_string()));
-    assert_eq!(map.get("schema_version"), Some(&LOG_SCHEMA_VERSION.to_string()));
+    assert_eq!(
+        map.get("schema_version"),
+        Some(&LOG_SCHEMA_VERSION.to_string())
+    );
     assert_eq!(map.get("candidate_id"), Some(&"sha256:def".to_string()));
 }
 
@@ -51,7 +69,10 @@ fn redaction_masks_sensitive_fields_and_tokens() {
         redact_value("http_header", "BeArEr my-secret"),
         "BeArEr [REDACTED]"
     );
-    assert_eq!(redact_value("authorization", "Bearer my-secret"), "[REDACTED]");
+    assert_eq!(
+        redact_value("authorization", "Bearer my-secret"),
+        "[REDACTED]"
+    );
     assert_eq!(redact_value("plain_field", "visible"), "visible");
 }
 
@@ -64,6 +85,7 @@ fn run_summary_contains_auditable_reason_and_counts() {
         iterations: 1,
         actions_planned: 0,
         actions_completed: 0,
+        reclaimed_estimated_bytes: 0,
         action_failures: 0,
         skipped_candidates: 3,
         initial_usage: Some(sample_usage()),
@@ -94,6 +116,7 @@ fn optional_metrics_recorder_captures_run_metrics() {
         iterations: 2,
         actions_planned: 4,
         actions_completed: 3,
+        reclaimed_estimated_bytes: 0,
         action_failures: 1,
         skipped_candidates: 0,
         initial_usage: Some(sample_usage()),
@@ -124,8 +147,18 @@ fn least_privilege_check_fails_closed_for_root_or_unknown_uid() {
 
 #[test]
 fn portability_matrix_accepts_linux_and_macos_only() {
-    assert_eq!(parse_supported_os("linux").expect("linux supported").as_str(), "linux");
-    assert_eq!(parse_supported_os("macos").expect("macos supported").as_str(), "macos");
+    assert_eq!(
+        parse_supported_os("linux")
+            .expect("linux supported")
+            .as_str(),
+        "linux"
+    );
+    assert_eq!(
+        parse_supported_os("macos")
+            .expect("macos supported")
+            .as_str(),
+        "macos"
+    );
     assert!(parse_supported_os("windows").is_none());
     assert!(parse_supported_os("win32").is_none());
 }
@@ -134,16 +167,17 @@ fn portability_matrix_accepts_linux_and_macos_only() {
 fn preflight_enforces_fail_closed_when_os_or_privilege_is_unsafe() {
     let unsupported_os = preflight_execution(false, "solaris", Some(1000));
     assert!(unsupported_os.enforce_dry_run);
-    assert!(unsupported_os.reasons.iter().any(|reason| reason.contains("unsupported os")));
+    assert!(unsupported_os
+        .reasons
+        .iter()
+        .any(|reason| reason.contains("unsupported os")));
 
     let elevated = preflight_execution(false, "linux", Some(0));
     assert!(elevated.enforce_dry_run);
-    assert!(
-        elevated
-            .reasons
-            .iter()
-            .any(|reason| reason.contains("least-privilege"))
-    );
+    assert!(elevated
+        .reasons
+        .iter()
+        .any(|reason| reason.contains("least-privilege")));
 
     let safe = preflight_execution(false, "linux", Some(1000));
     assert!(!safe.enforce_dry_run);

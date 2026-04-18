@@ -68,6 +68,48 @@ fn planner_uses_conservative_fallback_for_first_unknown_size_candidate() {
 }
 
 #[test]
+fn planner_chunks_oversized_build_cache_candidate_to_remaining_cap() {
+    let mut cfg = base_config();
+    cfg.max_delete_per_run_gb = 10;
+    cfg.dry_run = false;
+    let planner = CleanupPlanner::new(cfg.clone());
+
+    let request = ActionPlanningRequest {
+        backend: BackendKind::Docker,
+        config: cfg,
+        usage: usage_template(),
+        candidates: vec![CandidateArtifact {
+            backend: BackendKind::Docker,
+            resource_kind: ResourceKind::BuildCache,
+            identifier: "docker-build-cache-unused".to_string(),
+            display_name: Some("docker-build-cache".to_string()),
+            labels: BTreeSet::new(),
+            size_bytes: Some(12 * BYTES_PER_GIB),
+            age_days: Some(30),
+            in_use: Some(false),
+            referenced: Some(false),
+            protected: false,
+            metadata_complete: true,
+            metadata_ambiguous: false,
+            discovered_at: None,
+        }],
+    };
+
+    let plan = planner.plan(request);
+
+    assert_eq!(plan.actions.len(), 1);
+    assert_eq!(
+        plan.actions[0].candidate.resource_kind,
+        ResourceKind::BuildCache
+    );
+    assert_eq!(
+        plan.actions[0].candidate.size_bytes,
+        Some(10 * BYTES_PER_GIB)
+    );
+    assert!(plan.skipped.is_empty());
+}
+
+#[test]
 fn planner_skips_unknown_size_candidate_when_delete_budget_is_zero() {
     let mut cfg = base_config();
     cfg.max_delete_per_run_gb = 0;
@@ -251,10 +293,17 @@ fn planner_preserves_skipped_order_across_policy_and_planner_rejections() {
         .collect();
 
     assert_eq!(planned_ids, vec!["img-size-fourth"]);
-    assert_eq!(skipped_ids, vec!["img-cap-first", "img-policy-second", "img-backend-third"]);
+    assert_eq!(
+        skipped_ids,
+        vec!["img-cap-first", "img-policy-second", "img-backend-third"]
+    );
     assert_eq!(
         skipped_reasons,
-        vec!["deletion_cap_reached", "metadata_incomplete", "candidate_backend_mismatch"]
+        vec![
+            "deletion_cap_reached",
+            "metadata_incomplete",
+            "candidate_backend_mismatch"
+        ]
     );
 }
 

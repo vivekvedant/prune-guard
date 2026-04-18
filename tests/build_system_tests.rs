@@ -12,7 +12,9 @@ fn read_text(path: &Path) -> String {
 }
 
 fn contains_case_insensitive(haystack: &str, needle: &str) -> bool {
-    haystack.to_ascii_lowercase().contains(&needle.to_ascii_lowercase())
+    haystack
+        .to_ascii_lowercase()
+        .contains(&needle.to_ascii_lowercase())
 }
 
 fn assert_has_build_system_language(path: &Path) {
@@ -176,8 +178,8 @@ fn packaging_scripts_generate_sha256_checksums() {
         "linux deb packaging script must install a systemd timer unit"
     );
     assert!(
-        contains_case_insensitive(&deb_script, "enable prune-guard.timer"),
-        "linux deb packaging script must enable timer-based scheduling"
+        contains_case_insensitive(&deb_script, "enable prune-guard.service"),
+        "linux deb packaging script must enable daemon service for TOML-driven scheduling"
     );
 }
 
@@ -197,7 +199,7 @@ fn deb_packaging_script_keeps_payload_minimal_and_deterministic() {
 }
 
 #[test]
-fn systemd_units_exist_and_point_to_oneshot_install_paths() {
+fn systemd_units_exist_and_use_toml_interval_for_daemon_schedule() {
     let root = repo_root();
     let unit_path = root.join("packaging/systemd/prune-guard.service");
     let timer_path = root.join("packaging/systemd/prune-guard.timer");
@@ -213,24 +215,32 @@ fn systemd_units_exist_and_point_to_oneshot_install_paths() {
     let unit_content = read_text(&unit_path);
     let timer_content = read_text(&timer_path);
     assert!(
-        contains_case_insensitive(&unit_content, "type=oneshot"),
-        "systemd service must use oneshot execution mode"
+        contains_case_insensitive(&unit_content, "type=simple"),
+        "systemd service must run as a long-lived daemon process"
     );
     assert!(
         contains_case_insensitive(&unit_content, "execstart=/usr/bin/prune-guard"),
         "systemd unit must run the installed prune-guard binary"
     );
     assert!(
-        contains_case_insensitive(&unit_content, "--once"),
-        "systemd service must run prune-guard in one-shot mode"
+        !contains_case_insensitive(&unit_content, "--once"),
+        "systemd service must not force one-shot mode when TOML controls interval"
     );
     assert!(
         contains_case_insensitive(&unit_content, "/etc/prune-guard/prune-guard.toml"),
         "systemd unit must reference installed config path"
     );
     assert!(
-        contains_case_insensitive(&timer_content, "onunitactivesec"),
-        "systemd timer must schedule recurring runs"
+        contains_case_insensitive(&unit_content, "wantedby=multi-user.target"),
+        "systemd service must be enable-able at boot for TOML-driven scheduling"
+    );
+    assert!(
+        !contains_case_insensitive(&timer_content, "onunitactivesec"),
+        "systemd timer must not hardcode recurring cadence when TOML interval is authoritative"
+    );
+    assert!(
+        contains_case_insensitive(&timer_content, "onbootsec"),
+        "systemd timer should only bootstrap daemon startup after boot"
     );
     assert!(
         contains_case_insensitive(&timer_content, "unit=prune-guard.service"),
@@ -242,7 +252,10 @@ fn systemd_units_exist_and_point_to_oneshot_install_paths() {
 fn daemon_binary_source_exists_and_uses_install_config_default() {
     let root = repo_root();
     let main_rs_path = root.join("src/main.rs");
-    assert!(main_rs_path.exists(), "expected src/main.rs daemon entrypoint");
+    assert!(
+        main_rs_path.exists(),
+        "expected src/main.rs daemon entrypoint"
+    );
 
     let main_rs = read_text(&main_rs_path);
     assert!(
@@ -266,10 +279,7 @@ fn build_system_docs_and_flowcharts_are_indexed() {
         "docs/README.md must list the cross-platform build doc"
     );
     assert!(
-        contains_case_insensitive(
-            &flowcharts_readme,
-            "cross-platform-build-distribution.md"
-        ),
+        contains_case_insensitive(&flowcharts_readme, "cross-platform-build-distribution.md"),
         "flowcharts/README.md must list the cross-platform build flowchart"
     );
 }

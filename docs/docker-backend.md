@@ -13,6 +13,17 @@ The implementation is in `src/docker_backend.rs`.
 
 ## Backend Behavior
 
+### Docker Endpoint Selection
+
+- The daemon reads optional Docker CLI connection overrides from config:
+  - `[docker].host`
+  - `[docker].context`
+- Exactly one may be set; setting both is rejected during config validation (fail-closed).
+- When set, the backend prepends the corresponding global CLI flag to every Docker command:
+  - `--host <value>`
+  - `--context <value>`
+- This keeps `systemd` unit files static while still allowing users to target non-default Docker daemons (for example Docker Desktop sockets) through `/etc/prune-guard/prune-guard.toml`.
+
 ### Health Check
 
 - Runs `docker version --format {{.Server.Version}}`.
@@ -43,7 +54,8 @@ The implementation is in `src/docker_backend.rs`.
 - Image discovery has a fail-closed template fallback:
   - First attempt inspects labels via `.Config.Labels`.
   - If Docker returns the known template error (`map has no entry for key "Labels"`), discovery retries with a labels-free inspect template.
-  - Fallback candidates are emitted with `metadata_complete = false` / `metadata_ambiguous = true` so policy always skips deletion.
+  - If `protected_labels` is configured, fallback candidates are emitted with `metadata_complete = false` / `metadata_ambiguous = true` so policy skips deletion fail-closed.
+  - If `protected_labels` is empty, fallback candidates remain actionable because label-based protection is not required for safety checks.
 - Any ambiguous or missing critical metadata is emitted as incomplete/ambiguous, so policy/planner fail closed and skip deletion.
 - Volume discovery enriches `size_bytes` using `docker system df -v` volume output so delete-cap enforcement can remain bounded.
 - Build cache discovery uses `docker system df -v` build-cache output:
@@ -59,6 +71,10 @@ The implementation is in `src/docker_backend.rs`.
   - Image delete is blocked if image is referenced by any container.
   - Volume delete is blocked if volume is attached to any container.
   - Build cache delete uses `docker builder prune -f` and adds an `until=<hours>` filter when age metadata is available.
+  - When planner caps a build-cache action size for delete-budget enforcement, execution applies reclaim budget controls (`--max-used-space`, with `--keep-storage` fallback) so oversized cache sets can be reduced incrementally across runs.
+- Execution handles stale-plan races idempotently:
+  - If a container disappears between `docker ps -a` and `docker container inspect` during image/volume guards, that container is ignored as stale.
+  - If delete returns explicit "No such container/image/volume", action is treated as safe no-op success instead of a hard backend failure.
 - Safety blocks return `CleanupError::SafetyViolation`.
 - Delete command failures return `CleanupError::ExecutionFailed`.
 

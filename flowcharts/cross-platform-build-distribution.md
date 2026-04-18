@@ -19,7 +19,7 @@ flowchart TD
 flowchart TD
     A[Package artifacts] --> B[Generate checksums for every artifact]
     B --> C[Artifact upload for packaged binaries and checksum manifest]
-    C --> D[Verify Linux .deb includes binary config oneshot service and timer]
+    C --> D[Verify Linux .deb includes binary config daemon service and bootstrap timer]
     D --> E[Run platform smoke tests]
     E --> F{Did every smoke test pass?}
     F -- No --> G[Block release publication]

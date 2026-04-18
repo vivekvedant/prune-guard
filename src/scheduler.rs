@@ -56,6 +56,7 @@ pub struct SchedulerRunReport {
     pub iterations: usize,
     pub actions_planned: usize,
     pub actions_completed: usize,
+    pub reclaimed_estimated_bytes: u64,
     pub action_failures: usize,
     pub skipped_candidates: usize,
     pub initial_usage: Option<UsageSnapshot>,
@@ -73,6 +74,7 @@ impl SchedulerRunReport {
             iterations: 0,
             actions_planned: 0,
             actions_completed: 0,
+            reclaimed_estimated_bytes: 0,
             action_failures: 0,
             skipped_candidates: 0,
             initial_usage: None,
@@ -240,6 +242,12 @@ impl CleanupScheduler {
             }
 
             let execution_report = self.executor.execute_plan(Arc::clone(&backend), plan);
+            report.reclaimed_estimated_bytes += execution_report
+                .completed
+                .iter()
+                .filter(|response| response.executed)
+                .filter_map(|response| response.candidate.size_bytes)
+                .sum::<u64>();
             report.actions_completed += execution_report.completed.len();
             report.action_failures += execution_report.failures.len();
             if let Some(failure) = execution_report.failures.first() {
