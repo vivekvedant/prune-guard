@@ -29,12 +29,12 @@ The goal is to make the release path explicit, repeatable, and fail-closed befor
 - Any inconsistency between docs, flowcharts, and plan scope is treated as a failure condition.
 - The release process must prefer skipping a merge over publishing incomplete operational guidance.
 
-### Dry-Run Default
+### Runtime Default and Dry-Run Guidance
 
-- Dry-run remains the default operational mode unless a command or workflow explicitly requests real execution.
-- The runbook must call out dry-run validation before any destructive release step.
-- PR review must verify that documentation never implies real execution is the default.
-- If the documented default is ambiguous, the release is fail-closed and requires revision.
+- Real execution is the default operational mode unless `dry_run = true` is set explicitly.
+- The runbook must call out when dry-run validation is required before destructive release steps.
+- PR review must verify that documentation states runtime defaults clearly and does not imply hidden safety modes.
+- If documented defaults are ambiguous, the release is fail-closed and requires revision.
 
 ## Finalized Runbook Usage
 
@@ -48,7 +48,7 @@ The goal is to make the release path explicit, repeatable, and fail-closed befor
 
 - Branch name and target PR are correct.
 - Release scope matches the phase plan.
-- Safety defaults are still fail-closed and dry-run first.
+- Safety defaults are still fail-closed, with dry-run available as an explicit validation mode.
 - Relevant tests and checks are documented as passing or intentionally deferred.
 - Any deviation from the release path is explicitly recorded.
 
@@ -65,7 +65,7 @@ The goal is to make the release path explicit, repeatable, and fail-closed befor
 - Documentation updates are included.
 - Flowcharts reflect the current runtime and release workflow.
 - Safety rationale is present for any deletion-sensitive behavior.
-- Dry-run and fail-closed defaults are explicit.
+- Runtime defaults, dry-run usage, and fail-closed behavior are explicit.
 - The branch can be merged without requiring hidden tribal knowledge.
 
 ## Safety Rationale
@@ -73,7 +73,7 @@ The goal is to make the release path explicit, repeatable, and fail-closed befor
 - Release readiness is a documentation problem as much as a code problem in a safety-critical system.
 - Explicit runbooks and checklists reduce the chance that a reviewer assumes unsafe defaults.
 - Fail-closed release rules prevent unclear or partial guidance from being treated as approved operating practice.
-- Dry-run default documentation keeps the operational baseline conservative unless a reviewer can prove otherwise.
+- Clear runtime-default and dry-run documentation keeps operator behavior auditable unless a reviewer can prove otherwise.
 
 ## Expected Documentation Set
 

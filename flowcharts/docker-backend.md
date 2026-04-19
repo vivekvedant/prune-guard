@@ -8,8 +8,19 @@ This document captures Docker adapter control flow and safety guards.
 flowchart TD
     A[Load docker.host / docker.context from config] --> B{Exactly one set?}
     B -- No, both set --> C[Config validation fails closed]
-    B -- Yes or none --> D[Build docker CLI global args]
+    B -- Yes --> D[Build docker CLI global args]
+    B -- None --> F[Probe known local socket endpoints with docker version]
+    F --> G{Exactly one reachable Desktop socket host?}
+    G -- Yes --> H[Use detected Desktop --host endpoint]
+    G -- No --> J{Any Desktop reachable?}
+    J -- Yes, multiple --> I[Fail closed and require explicit docker.host or docker.context]
+    J -- No --> K{Exactly one reachable non-Desktop socket host?}
+    K -- Yes --> L[Use detected non-Desktop --host endpoint]
+    K -- No, none reachable --> D
+    K -- No, multiple reachable --> I
     D --> E[Prefix every docker command with --host or --context when configured]
+    H --> E
+    L --> E
 ```
 
 ## Discovery Safety Flow
@@ -23,16 +34,10 @@ flowchart TD
     C -- No --> E[Use primary inspect output]
     D --> F{protected_labels configured?}
     F -- No --> F2[Proceed without label-based safety requirement]
-    F -- Yes --> F3{allow_missing_image_labels enabled?}
-    F3 -- No --> F1[Mark labels unknown -> metadata_complete=false]
-    F3 -- Yes --> F4[Inspect json labels and require exact `null`]
-    F4 --> F5{labels json exactly null?}
-    F5 -- No --> F1
-    F5 -- Yes --> F6[Treat labels as safe empty set]
+    F -- Yes --> F1[Mark labels unknown -> metadata_complete=false]
     E --> G[Build candidate metadata]
     F1 --> G
     F2 --> G
-    F6 --> G
     G --> H{Metadata complete and unambiguous?}
     H -- No --> I[Mark metadata_ambiguous / metadata_complete=false]
     H -- Yes --> J[Mark candidate with in_use and referenced flags]

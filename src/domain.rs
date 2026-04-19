@@ -5,8 +5,8 @@ use std::time::SystemTime;
 ///
 /// This module is intentionally backend-agnostic: Docker/Podman-specific code
 /// should convert their data into these types and then follow the same flow.
-/// Config-facing defaults stay conservative: dry-run is enabled unless a caller
-/// explicitly turns it off in a higher layer.
+/// Config-facing defaults intentionally mirror install-time behavior so callers
+/// do not silently diverge from runtime defaults.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CleanupConfig {
     /// Scheduler interval between daemon ticks.
@@ -19,12 +19,8 @@ pub struct CleanupConfig {
     pub min_unused_age_days: u64,
     /// Upper bound on deletion size per run.
     pub max_delete_per_run_gb: u64,
-    /// Safety default: do not perform real deletions unless explicitly disabled.
+    /// Execution mode guard: when true, perform simulation-only execution.
     pub dry_run: bool,
-    /// Opt-in compatibility mode:
-    /// when true, Docker images with missing labels metadata may be treated as
-    /// having empty labels only after explicit null-label verification.
-    pub allow_missing_image_labels: bool,
     /// Image IDs or names that must never be deleted.
     pub protected_images: Vec<String>,
     /// Volume IDs or names that must never be deleted.
@@ -41,8 +37,7 @@ impl Default for CleanupConfig {
             target_watermark_percent: 70,
             min_unused_age_days: 7,
             max_delete_per_run_gb: 10,
-            dry_run: true,
-            allow_missing_image_labels: false,
+            dry_run: false,
             protected_images: Vec::new(),
             protected_volumes: Vec::new(),
             protected_labels: Vec::new(),

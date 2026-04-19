@@ -13,7 +13,7 @@ Use this checklist to confirm that a cleanup-daemon change is safe, documented, 
 - [ ] The matching flowchart is present and current.
 - [ ] The release runbook is present and current.
 - [ ] The PR checklist itself is present and current.
-- [ ] Dry-run is documented as the default behavior.
+- [ ] Default runtime mode is documented accurately (including whether dry-run must be explicitly enabled).
 - [ ] Fail-closed behavior is documented for all safety-sensitive paths.
 - [ ] Any skip/no-op decision is explained in the docs.
 - [ ] Any runtime guard or preflight behavior is explained in the docs.
@@ -33,11 +33,11 @@ Use this structure in the PR description:
 - What changed
 - Why it changed
 - What safety checks protect the behavior
-- Whether the default path is still dry-run
+- Whether runtime defaults changed and how dry-run is enabled when needed
 - Whether any follow-up work remains
 
 ## Safety Rationale
 
 - A checklist makes release readiness auditable.
-- Explicit dry-run and fail-closed checks prevent reviewers from assuming unsafe defaults.
+- Explicit runtime-default, dry-run, and fail-closed checks prevent reviewers from assuming unsafe defaults.
 - Requiring documentation parity reduces the risk of merging code with incomplete operator guidance.

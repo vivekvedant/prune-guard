@@ -16,7 +16,7 @@ Use this runbook for branches that are intended to merge into `main` and change 
 1. Confirm the PR target is `main`.
 1. Confirm the release is still aligned with `plan.md`.
 1. Confirm the docs set includes the relevant phase note, flowchart, runbook, and PR checklist.
-1. Confirm that dry-run is still documented as the default runtime mode.
+1. Confirm that runtime defaults are documented accurately, including how dry-run is enabled.
 1. Confirm that fail-closed behavior is documented for every safety-critical decision point.
 
 ## Release Procedure
@@ -32,7 +32,7 @@ Use this runbook for branches that are intended to merge into `main` and change 
 - Read the matching flowchart page.
 - Confirm the diagram shows the actual runtime or release path.
 - Confirm unsafe paths terminate in skip, no-op, or fail-closed outcomes.
-- Confirm dry-run remains the default path unless real execution is explicitly selected.
+- Confirm runtime defaults and dry-run guidance are explicit for the reviewed flow.
 
 ### 3. Use the PR Checklist
 
@@ -57,7 +57,7 @@ Use this runbook for branches that are intended to merge into `main` and change 
 
 - Documentation is complete and aligned with the implementation phase.
 - Flowcharts represent the current fail-closed behavior.
-- Dry-run default is explicit in the docs.
+- Runtime defaults and dry-run guidance are explicit in the docs.
 - No unresolved safety question remains.
 - The PR is ready to merge without relying on hidden context.
 
@@ -68,7 +68,7 @@ Stop the release if any of the following is true:
 - The branch is not the intended release branch.
 - The target is not `main`.
 - The phase docs and flowcharts disagree.
-- Dry-run behavior is unclear.
+- Runtime default or dry-run behavior is unclear.
 - Fail-closed behavior is unclear.
 - A safety-sensitive decision is undocumented.
 
@@ -77,4 +77,4 @@ Stop the release if any of the following is true:
 - A release runbook prevents operators from improvising unsafe steps during merge preparation.
 - Re-checking docs and flowcharts guards against drift between implementation and release guidance.
 - Abort conditions are necessary because silence or ambiguity is unsafe in a deletion-capable system.
-- Dry-run-first documentation keeps the operational default conservative.
+- Explicit runtime-default and dry-run documentation reduces operator ambiguity.

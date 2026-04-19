@@ -19,6 +19,17 @@ The implementation is in `src/docker_backend.rs`.
   - `[docker].host`
   - `[docker].context`
 - Exactly one may be set; setting both is rejected during config validation (fail-closed).
+- When neither override is set, startup attempts host auto-detection from known local socket paths:
+  - `unix:///var/run/docker.sock`
+  - `unix:///run/docker.sock`
+  - `unix://$HOME/.docker/desktop/docker.sock`
+  - `unix:///home/*/.docker/desktop/docker.sock`
+- Each discovered candidate is probed with `docker --host <candidate> version --format {{.Server.Version}}`.
+- If exactly one Docker Desktop socket candidate is reachable, that endpoint is selected even when other non-Desktop sockets are reachable.
+- Ambiguous auto-detection still fails closed:
+  - multiple reachable Docker Desktop sockets
+  - multiple reachable non-Desktop sockets when no Desktop socket is reachable
+- On fail-closed ambiguity, startup requires explicit `docker.host` or `docker.context` in TOML.
 - When set, the backend prepends the corresponding global CLI flag to every Docker command:
   - `--host <value>`
   - `--context <value>`
@@ -54,10 +65,8 @@ The implementation is in `src/docker_backend.rs`.
 - Image discovery has a fail-closed template fallback:
   - First attempt inspects labels via `.Config.Labels`.
   - If Docker returns the known template error (`map has no entry for key "Labels"`), discovery retries with a labels-free inspect template.
-  - Default behavior is fail-closed: when label-based safety cannot be proven, fallback candidates are emitted with `metadata_complete = false` / `metadata_ambiguous = true` so policy skips deletion.
+  - Fallback remains fail-closed: when label-based safety cannot be proven, candidates are emitted with `metadata_complete = false` / `metadata_ambiguous = true` so policy skips deletion.
   - If `protected_labels` is empty, fallback candidates remain actionable because label-based protection is not required.
-  - Optional compatibility mode: set `allow_missing_image_labels = true` to run a second labels check with `{{json .Config.Labels}}`.
-  - In compatibility mode, labels are treated as safely empty only when that JSON output is exactly `null`; any other output or command failure remains fail-closed.
 - Any ambiguous or missing critical metadata is emitted as incomplete/ambiguous, so policy/planner fail closed and skip deletion.
 - Volume discovery enriches `size_bytes` using `docker system df -v` volume output so delete-cap enforcement can remain bounded.
 - Build cache discovery uses `docker system df -v` build-cache output:

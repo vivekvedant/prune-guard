@@ -18,7 +18,7 @@ use std::path::Path;
 /// This module intentionally keeps parsing conservative:
 /// - unsupported keys are rejected
 /// - invalid threshold relationships are rejected
-/// - `dry_run` defaults to `true`
+/// - `dry_run` defaults to `false`
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Config {
     /// Daemon scheduler interval (seconds).
@@ -31,10 +31,8 @@ pub struct Config {
     pub min_unused_age_days: u64,
     /// Maximum allowed deletion volume per run (GB).
     pub max_delete_per_run_gb: u64,
-    /// Safety default: simulate only.
+    /// Runtime execution mode flag (`true` means simulate-only).
     pub dry_run: bool,
-    /// Opt-in compatibility mode for runtimes that omit image labels metadata.
-    pub allow_missing_image_labels: bool,
     /// Enabled backend identifiers (for example: docker, podman).
     pub enabled_backends: Vec<String>,
     /// Explicitly protected images.
@@ -57,8 +55,7 @@ impl Default for Config {
             target_watermark_percent: 70,
             min_unused_age_days: 30,
             max_delete_per_run_gb: 10,
-            dry_run: true,
-            allow_missing_image_labels: false,
+            dry_run: false,
             enabled_backends: vec!["docker".to_string()],
             protected_images: Vec::new(),
             protected_volumes: Vec::new(),
@@ -135,15 +132,6 @@ impl Config {
             &["dry_run", "safety.dry_run", "runtime.dry_run"],
             config.dry_run,
             "dry_run",
-        )?;
-        config.allow_missing_image_labels = take_bool(
-            &entries,
-            &[
-                "allow_missing_image_labels",
-                "safety.allow_missing_image_labels",
-            ],
-            config.allow_missing_image_labels,
-            "allow_missing_image_labels",
         )?;
         config.enabled_backends = take_string_array(
             &entries,
@@ -554,8 +542,6 @@ fn is_known_key(key: &str) -> bool {
             "dry_run",
             "safety.dry_run",
             "runtime.dry_run",
-            "allow_missing_image_labels",
-            "safety.allow_missing_image_labels",
             "enabled_backends",
             "backends.enabled_backends",
             "protected_images",

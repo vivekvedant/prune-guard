@@ -32,7 +32,7 @@ It does not perform real cleanup against Docker/Podman yet. It defines the share
 
 This foundation intentionally defaults to fail-closed behavior.
 
-- `dry_run` defaults to `true`
+- `dry_run` defaults to `false`
 - unknown or ambiguous candidate metadata is treated as non-actionable
 - invalid watermark relationships are rejected at config load time
 - unknown config keys are rejected to avoid silent misconfiguration
@@ -47,7 +47,6 @@ The current config model supports:
 - `min_unused_age_days`
 - `max_delete_per_run_gb`
 - `dry_run`
-- `allow_missing_image_labels`
 - `enabled_backends`
 - `protected_images`
 - `protected_volumes`
