@@ -106,12 +106,12 @@ grep -n "interval_secs" /etc/prune-guard/prune-guard.toml
 
 ```toml
 [docker]
-# Choose exactly one
+# Optional explicit override; choose exactly one when required
 host = "unix:///home/<user>/.docker/desktop/docker.sock"
 # context = "desktop-linux"
 ```
 
-Use this when service execution context differs from your interactive shell Docker context.
+If both are unset, prune-guard auto-detects known local Docker socket paths. A single reachable Docker Desktop socket is prioritized automatically; otherwise ambiguous Desktop or non-Desktop endpoint sets fail closed until you set `docker.host` or `docker.context`.
 
 ## Smoke Test
 
