@@ -37,15 +37,14 @@ fn run() -> Result<(), String> {
     let requested_ticks = if options.once { Some(1) } else { options.ticks };
 
     match backend.as_str() {
-        "docker" => run_scheduler_loop(
-            &scheduler,
-            DockerBackend::with_connection(
+        "docker" => {
+            let backend = DockerBackend::with_connection(
                 config.docker_host.clone(),
                 config.docker_context.clone(),
-            ),
-            &cleanup_config,
-            requested_ticks,
-        ),
+            )
+            .map_err(|message| format!("failed to resolve docker connection: {message}"))?;
+            run_scheduler_loop(&scheduler, backend, &cleanup_config, requested_ticks)
+        }
         "podman" => run_scheduler_loop(
             &scheduler,
             PodmanBackend::new(),
