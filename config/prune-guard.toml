@@ -2,7 +2,7 @@
 # Deploy this file to: /etc/prune-guard/prune-guard.toml
 #
 # Safety-first defaults:
-# - dry_run stays enabled
+# - dry_run defaults to false (real execution)
 # - conservative watermarks and age thresholds
 # - missing image labels remain fail-closed by default
 # - explicit protected lists default to empty
@@ -11,7 +11,7 @@ allow_missing_image_labels = false
 
 [runtime]
 interval_secs = 900
-dry_run = true
+dry_run = false
 
 [thresholds]
 high_watermark_percent = 85

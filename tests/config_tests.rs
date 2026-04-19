@@ -8,7 +8,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 fn default_config_is_safety_first() {
     let cfg = Config::default();
 
-    assert!(cfg.dry_run, "dry_run must default to true");
+    assert!(!cfg.dry_run, "dry_run must default to false");
     assert_eq!(cfg.interval_secs, 900);
     assert_eq!(cfg.high_watermark_percent, 85);
     assert_eq!(cfg.target_watermark_percent, 70);
@@ -182,8 +182,8 @@ fn install_config_template_exists_and_is_safety_first() {
     });
 
     assert!(
-        cfg.dry_run,
-        "installed config template must default to dry-run fail-closed mode"
+        !cfg.dry_run,
+        "installed config template must default to real-run mode"
     );
     assert!(
         cfg.target_watermark_percent < cfg.high_watermark_percent,

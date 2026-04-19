@@ -20,7 +20,7 @@ flowchart TD
 ```mermaid
 flowchart TD
     A[Start release review] --> B[Validate branch and PR target]
-    B --> C[Confirm dry-run default is documented]
+    B --> C[Confirm runtime default and dry-run guidance are documented]
     C --> D[Confirm fail-closed behavior is documented]
     D --> E{Any missing or unclear safety item?}
     E -- Yes --> F[Stop release]
@@ -43,5 +43,5 @@ flowchart TD
 Notes:
 
 - Release readiness is not complete until docs, flowcharts, and checklist agree on the same safety model.
-- Dry-run remains the documented default unless an explicit real-execution step says otherwise.
+- Runtime defaults and dry-run guidance must be documented explicitly before release approval.
 - Any unresolved ambiguity blocks the release rather than being interpreted optimistically.

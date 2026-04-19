@@ -32,7 +32,7 @@ It does not perform real cleanup against Docker/Podman yet. It defines the share
 
 This foundation intentionally defaults to fail-closed behavior.
 
-- `dry_run` defaults to `true`
+- `dry_run` defaults to `false`
 - unknown or ambiguous candidate metadata is treated as non-actionable
 - invalid watermark relationships are rejected at config load time
 - unknown config keys are rejected to avoid silent misconfiguration

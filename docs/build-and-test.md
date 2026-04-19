@@ -121,7 +121,7 @@ After a release build, run a smoke test to confirm the daemon binary starts and 
 ./target/release/prune-guard --help
 ```
 
-Optional one-shot dry-run smoke test using the install config template:
+Optional one-shot smoke test using the install config template:
 
 ```bash
 ./target/release/prune-guard --config config/prune-guard.toml --once
@@ -152,7 +152,7 @@ Safety notes:
 
 - This helper intentionally increases local Docker storage; do not run on shared or production Docker hosts.
 - If Docker is unavailable, the script exits immediately (fail-closed behavior).
-- Dry-run for prune-guard daemon validation remains the default behavior in `config/prune-guard.toml`.
+- Real execution is the default behavior in `config/prune-guard.toml`; enable dry-run explicitly when validating in simulation mode.
 
 ## logs
 journalctl -u prune-guard -n 50 --no-pager
