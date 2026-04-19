@@ -451,6 +451,11 @@ jobs:
               exit 1
             fi
 
+            if [ -z "${CIRCLE_PROJECT_USERNAME:-}" ] || [ -z "${CIRCLE_PROJECT_REPONAME:-}" ]; then
+              echo "CircleCI project metadata is incomplete; refusing release publication."
+              exit 1
+            fi
+
             if ! command -v gh >/dev/null 2>&1; then
               sudo mkdir -p /etc/apt/keyrings
               curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
@@ -463,6 +468,7 @@ jobs:
             fi
 
             export GH_TOKEN="${GITHUB_TOKEN}"
+            export GH_REPO="${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}"
 
             workspace_dist="/tmp/prune-guard-workspace/dist"
             if [ ! -d "$workspace_dist" ]; then
@@ -491,7 +497,7 @@ jobs:
             done
 
             release_notes="Automated CircleCI release for ${CIRCLE_TAG}. All platform artifacts passed build, packaging, and smoke checks."
-            if gh release view "${CIRCLE_TAG}" >/dev/null 2>&1; then
+            if gh release view "${CIRCLE_TAG}" --repo "${GH_REPO}" >/dev/null 2>&1; then
               gh release upload "${CIRCLE_TAG}" \
                 "$linux_deb" \
                 "$linux_sha" \
@@ -499,6 +505,7 @@ jobs:
                 "$mac_sha" \
                 "$windows_archive" \
                 "$windows_sha" \
+                --repo "${GH_REPO}" \
                 --clobber
             else
               gh release create "${CIRCLE_TAG}" \
@@ -508,6 +515,7 @@ jobs:
                 "$mac_sha" \
                 "$windows_archive" \
                 "$windows_sha" \
+                --repo "${GH_REPO}" \
                 --title "prune-guard ${CIRCLE_TAG}" \
                 --notes "$release_notes"
             fi
