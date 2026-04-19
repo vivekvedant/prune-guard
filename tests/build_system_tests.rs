@@ -128,6 +128,10 @@ fn circleci_cross_platform_workflow_exists_and_has_required_jobs() {
         "CircleCI windows workflow must verify packaged zip artifacts"
     );
     assert!(
+        contains_case_insensitive(&config, ".exe"),
+        "CircleCI windows workflow must verify packaged installer exe artifacts"
+    );
+    assert!(
         contains_case_insensitive(&config, ".tar.gz.sha256"),
         "CircleCI release publication must include macOS checksums"
     );
@@ -138,6 +142,10 @@ fn circleci_cross_platform_workflow_exists_and_has_required_jobs() {
     assert!(
         contains_case_insensitive(&config, ".zip.sha256"),
         "CircleCI release publication must include Windows checksums"
+    );
+    assert!(
+        contains_case_insensitive(&config, ".exe.sha256"),
+        "CircleCI release publication must include Windows installer checksums"
     );
     assert!(
         contains_case_insensitive(&config, "gh release create"),
@@ -248,6 +256,10 @@ fn packaging_scripts_generate_sha256_checksums() {
         "windows packaging script must emit zip artifacts"
     );
     assert!(
+        contains_case_insensitive(&powershell_script, ".exe"),
+        "windows packaging script must emit installer exe artifacts"
+    );
+    assert!(
         !contains_case_insensitive(&powershell_script, "[System.IO.Path]::GetRelativePath"),
         "windows packaging script must avoid Path.GetRelativePath because it is unavailable in older Windows PowerShell/.NET runtimes"
     );
@@ -270,6 +282,34 @@ fn packaging_scripts_generate_sha256_checksums() {
     assert!(
         contains_case_insensitive(&deb_script, "enable prune-guard.service"),
         "linux deb packaging script must enable daemon service for TOML-driven scheduling"
+    );
+}
+
+#[test]
+fn windows_installer_script_exists_and_prompts_for_path_update() {
+    let root = repo_root();
+    let installer_script_path = root.join("packaging/windows/prune-guard-installer.iss");
+    assert!(
+        installer_script_path.exists(),
+        "expected packaging/windows/prune-guard-installer.iss"
+    );
+
+    let installer_script = read_text(&installer_script_path);
+    assert!(
+        contains_case_insensitive(&installer_script, "wizardstyle=classic"),
+        "windows installer must use classic wizard styling with explicit Next navigation"
+    );
+    assert!(
+        contains_case_insensitive(&installer_script, "[tasks]"),
+        "windows installer must define optional tasks"
+    );
+    assert!(
+        contains_case_insensitive(&installer_script, "addtopath"),
+        "windows installer must provide an add-to-path task"
+    );
+    assert!(
+        contains_case_insensitive(&installer_script, "changesenvironment=yes"),
+        "windows installer must notify windows when environment variables are changed"
     );
 }
 

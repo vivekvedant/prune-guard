@@ -358,6 +358,11 @@ jobs:
               Invoke-WebRequest -Uri https://win.rustup.rs/x86_64 -OutFile rustup-init.exe
               .\rustup-init.exe -y --profile minimal --default-toolchain stable
             }
+
+            if (-not (Get-Command iscc -ErrorAction SilentlyContinue)) {
+              choco install innosetup -y --no-progress
+            }
+
             $env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
             cargo --version
             rustc --version
@@ -401,15 +406,15 @@ jobs:
           command: |
             $archivePath = Get-ChildItem -LiteralPath dist -Filter *.zip -File | Select-Object -First 1
             if (-not $archivePath -or $archivePath.Length -le 0) {
-              throw "Packaged archive is missing or empty."
+              throw "Packaged zip archive is missing or empty."
             }
 
             $checksumPath = "$($archivePath.FullName).sha256"
             if (-not (Test-Path -LiteralPath $checksumPath)) {
-              throw "Checksum file is missing."
+              throw "Zip checksum file is missing."
             }
             if ((Get-Item -LiteralPath $checksumPath).Length -le 0) {
-              throw "Checksum file is empty."
+              throw "Zip checksum file is empty."
             }
 
             $verifyDir = Join-Path $env:TEMP "prune-guard-verify-$([Guid]::NewGuid().ToString('N'))"
@@ -418,6 +423,19 @@ jobs:
               Expand-Archive -LiteralPath $archivePath.FullName -DestinationPath $verifyDir -Force
             } finally {
               Remove-Item -LiteralPath $verifyDir -Recurse -Force -ErrorAction SilentlyContinue
+            }
+
+            $installerPath = Get-ChildItem -LiteralPath dist -Filter *-setup.exe -File | Select-Object -First 1
+            if (-not $installerPath -or $installerPath.Length -le 0) {
+              throw "Packaged installer exe is missing or empty."
+            }
+
+            $installerChecksumPath = "$($installerPath.FullName).sha256"
+            if (-not (Test-Path -LiteralPath $installerChecksumPath)) {
+              throw "Installer checksum file is missing."
+            }
+            if ((Get-Item -LiteralPath $installerChecksumPath).Length -le 0) {
+              throw "Installer checksum file is empty."
             }
 
       - store_artifacts:
@@ -482,6 +500,8 @@ jobs:
             mac_sha="$(find "$workspace_dist" -maxdepth 1 -type f -name "*.tar.gz.sha256" -print -quit)"
             windows_archive="$(find "$workspace_dist" -maxdepth 1 -type f -name "*.zip" -print -quit)"
             windows_sha="$(find "$workspace_dist" -maxdepth 1 -type f -name "*.zip.sha256" -print -quit)"
+            windows_installer="$(find "$workspace_dist" -maxdepth 1 -type f -name "*-setup.exe" -print -quit)"
+            windows_installer_sha="$(find "$workspace_dist" -maxdepth 1 -type f -name "*-setup.exe.sha256" -print -quit)"
 
             for required_asset in \
               "$linux_deb" \
@@ -489,7 +509,9 @@ jobs:
               "$mac_archive" \
               "$mac_sha" \
               "$windows_archive" \
-              "$windows_sha"; do
+              "$windows_sha" \
+              "$windows_installer" \
+              "$windows_installer_sha"; do
               if [ -z "$required_asset" ] || [ ! -s "$required_asset" ]; then
                 echo "Release asset missing or empty."
                 exit 1
@@ -505,6 +527,8 @@ jobs:
                 "$mac_sha" \
                 "$windows_archive" \
                 "$windows_sha" \
+                "$windows_installer" \
+                "$windows_installer_sha" \
                 --repo "${GH_REPO}" \
                 --clobber
             else
@@ -515,6 +539,8 @@ jobs:
                 "$mac_sha" \
                 "$windows_archive" \
                 "$windows_sha" \
+                "$windows_installer" \
+                "$windows_installer_sha" \
                 --repo "${GH_REPO}" \
                 --title "prune-guard ${CIRCLE_TAG}" \
                 --notes "$release_notes"
