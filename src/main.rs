@@ -191,7 +191,6 @@ fn to_cleanup_config(config: &Config) -> CleanupConfig {
         min_unused_age_days: config.min_unused_age_days,
         max_delete_per_run_gb: config.max_delete_per_run_gb,
         dry_run: config.dry_run,
-        allow_missing_image_labels: config.allow_missing_image_labels,
         protected_images: config.protected_images.clone(),
         protected_volumes: config.protected_volumes.clone(),
         protected_labels: config.protected_labels.clone(),

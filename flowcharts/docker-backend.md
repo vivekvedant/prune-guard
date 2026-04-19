@@ -34,16 +34,10 @@ flowchart TD
     C -- No --> E[Use primary inspect output]
     D --> F{protected_labels configured?}
     F -- No --> F2[Proceed without label-based safety requirement]
-    F -- Yes --> F3{allow_missing_image_labels enabled?}
-    F3 -- No --> F1[Mark labels unknown -> metadata_complete=false]
-    F3 -- Yes --> F4[Inspect json labels and require exact `null`]
-    F4 --> F5{labels json exactly null?}
-    F5 -- No --> F1
-    F5 -- Yes --> F6[Treat labels as safe empty set]
+    F -- Yes --> F1[Mark labels unknown -> metadata_complete=false]
     E --> G[Build candidate metadata]
     F1 --> G
     F2 --> G
-    F6 --> G
     G --> H{Metadata complete and unambiguous?}
     H -- No --> I[Mark metadata_ambiguous / metadata_complete=false]
     H -- Yes --> J[Mark candidate with in_use and referenced flags]
