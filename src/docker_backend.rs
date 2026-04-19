@@ -118,6 +118,32 @@ impl<R: CommandRunner> DockerBackend<R> {
             .run("df", &["-B1", "--output=used,size", root_dir])
     }
 
+    fn run_windows_drive_usage_probe(
+        &self,
+        drive_letter: char,
+    ) -> std::result::Result<String, String> {
+        // Windows does not provide `df`, so we query the drive that contains
+        // DockerRootDir and compute used/total bytes fail-closed.
+        let script = format!(
+            "$d=Get-PSDrive -Name {drive_letter}; if ($null -eq $d) {{ exit 1 }}; Write-Output ($d.Used); Write-Output ($d.Used + $d.Free)"
+        );
+        self.runner.run(
+            "powershell",
+            &["-NoProfile", "-NonInteractive", "-Command", script.as_str()],
+        )
+    }
+
+    fn collect_windows_usage_from_root(
+        &self,
+        root_dir: &str,
+    ) -> std::result::Result<(u64, u64), String> {
+        let drive_letter = extract_windows_drive_letter(root_dir)
+            .ok_or_else(|| "docker root directory is not a windows drive path".to_string())?;
+        let powershell_output = self.run_windows_drive_usage_probe(drive_letter)?;
+        parse_windows_usage(&powershell_output)
+            .ok_or_else(|| "could not parse windows powershell usage output".to_string())
+    }
+
     fn collect_container_metadata_raw(
         &self,
     ) -> std::result::Result<Vec<ContainerMetadata>, String> {
@@ -611,18 +637,27 @@ impl<R: CommandRunner> UsageCollector for DockerBackend<R> {
             });
         }
 
-        let df_output =
-            self.run_df(root_dir)
-                .map_err(|message| CleanupError::UsageCollectionFailed {
+        let (used_bytes, total_bytes) = match self.run_df(root_dir) {
+            Ok(df_output) => match parse_df_usage(&df_output) {
+                Some(usage) => usage,
+                None => self.collect_windows_usage_from_root(root_dir).map_err(
+                    |windows_fallback_error| CleanupError::UsageCollectionFailed {
+                        backend: BackendKind::Docker,
+                        message: format!(
+                            "could not parse df usage output for `{root_dir}` and windows fallback failed: {windows_fallback_error}"
+                        ),
+                    },
+                )?,
+            },
+            Err(df_error) => self.collect_windows_usage_from_root(root_dir).map_err(
+                |windows_fallback_error| CleanupError::UsageCollectionFailed {
                     backend: BackendKind::Docker,
-                    message: format!("failed reading disk usage for `{root_dir}`: {message}"),
-                })?;
-
-        let (used_bytes, total_bytes) =
-            parse_df_usage(&df_output).ok_or_else(|| CleanupError::UsageCollectionFailed {
-                backend: BackendKind::Docker,
-                message: "could not parse df usage output".to_string(),
-            })?;
+                    message: format!(
+                        "failed reading disk usage for `{root_dir}`: primary_error={df_error}; windows_fallback_error={windows_fallback_error}"
+                    ),
+                },
+            )?,
+        };
 
         let used_percent = if total_bytes > 0 {
             Some(((used_bytes.saturating_mul(100)) / total_bytes) as u8)
@@ -1246,6 +1281,42 @@ fn parse_df_usage(df_output: &str) -> Option<(u64, u64)> {
     let used_bytes = parts.next()?.parse::<u64>().ok()?;
     let total_bytes = parts.next()?.parse::<u64>().ok()?;
     Some((used_bytes, total_bytes))
+}
+
+fn parse_windows_usage(output: &str) -> Option<(u64, u64)> {
+    let lines: Vec<&str> = output
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .collect();
+    if lines.len() >= 2 {
+        let used_bytes = lines.first()?.parse::<u64>().ok()?;
+        let total_bytes = lines.get(1)?.parse::<u64>().ok()?;
+        return Some((used_bytes, total_bytes));
+    }
+
+    let single_line = lines.first()?;
+    let mut parts = single_line.split_whitespace();
+    let used_bytes = parts.next()?.parse::<u64>().ok()?;
+    let total_bytes = parts.next()?.parse::<u64>().ok()?;
+    Some((used_bytes, total_bytes))
+}
+
+fn extract_windows_drive_letter(path: &str) -> Option<char> {
+    let bytes = path.as_bytes();
+    if bytes.len() < 2 {
+        return None;
+    }
+
+    for index in 0..(bytes.len() - 1) {
+        let current = bytes[index];
+        let next = bytes[index + 1];
+        if current.is_ascii_alphabetic() && next == b':' {
+            return Some((current as char).to_ascii_uppercase());
+        }
+    }
+
+    None
 }
 
 fn parse_age_days(created: &str, now: SystemTime) -> Option<u64> {

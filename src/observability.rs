@@ -268,6 +268,7 @@ pub fn evaluate_least_privilege(effective_uid: Option<u32>) -> LeastPrivilegeRep
 pub enum SupportedOs {
     Linux,
     MacOs,
+    Windows,
 }
 
 impl SupportedOs {
@@ -275,6 +276,7 @@ impl SupportedOs {
         match self {
             Self::Linux => "linux",
             Self::MacOs => "macos",
+            Self::Windows => "windows",
         }
     }
 }
@@ -283,6 +285,7 @@ pub fn parse_supported_os(name: &str) -> Option<SupportedOs> {
     match name.to_ascii_lowercase().as_str() {
         "linux" => Some(SupportedOs::Linux),
         "macos" | "darwin" => Some(SupportedOs::MacOs),
+        "windows" | "win32" | "win64" => Some(SupportedOs::Windows),
         _ => None,
     }
 }

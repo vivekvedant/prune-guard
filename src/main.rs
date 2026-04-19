@@ -8,6 +8,9 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
+#[cfg(target_os = "windows")]
+const DEFAULT_CONFIG_PATH: &str = "C:\\ProgramData\\prune-guard\\prune-guard.toml";
+#[cfg(not(target_os = "windows"))]
 const DEFAULT_CONFIG_PATH: &str = "/etc/prune-guard/prune-guard.toml";
 
 #[derive(Debug, Clone, PartialEq, Eq)]

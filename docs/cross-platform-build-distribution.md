@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Define a repeatable build and release path for Linux and macOS so the daemon can be distributed with the same safety model on every supported platform.
+Define a repeatable build and release path for Linux, macOS, and Windows so the daemon can be distributed with the same safety model on every supported platform.
 
 This feature makes the CircleCI build matrix, packaging rules, artifact integrity checks, and release gate explicit before any binary is published.
 
@@ -10,6 +10,7 @@ This feature makes the CircleCI build matrix, packaging rules, artifact integrit
 
 - Linux builds produce the primary server binary and any release-side helpers required for packaging.
 - macOS builds verify the daemon compiles and packages cleanly on Apple hosts.
+- Windows builds verify the daemon compiles and packages cleanly on Windows hosts.
 - The `.circleci/config.yml` workflow `cross-platform-build-distribution` defines these targets as required jobs.
 - Each target in the matrix must be treated as required unless the release scope explicitly narrows the supported platforms.
 - The matrix is complete only when every declared OS target has a successful build result and a recorded smoke test result.
@@ -25,10 +26,23 @@ This feature makes the CircleCI build matrix, packaging rules, artifact integrit
   - `/lib/systemd/system/prune-guard.timer` bootstrapping timer unit
 - Linux `.deb` packaging must exclude the recursive `target/release` build tree to keep artifacts small, deterministic, and resilient in CI.
 - macOS artifacts remain packaged as archive files with stable filenames.
+- Windows artifacts are packaged as `.zip` archives using `scripts/release/package-artifacts.ps1`.
+- Windows packaging must include `prune-guard.exe`, release metadata, and checksum files.
 - Packaging must keep the release payload minimal and deterministic.
 - Artifact upload must happen only after the packaged bytes and checksum manifest are ready.
 - CircleCI stores packaged artifacts per platform job so each target’s output is auditable independently.
 - Any missing artifact is treated as an incomplete release, not a partial success.
+
+## GitHub Release Publication
+
+- Release publication is tag-driven (`v*`) and runs only after Linux, macOS, and Windows packaging jobs complete successfully.
+- CircleCI collects `.deb`, `.tar.gz`, and `.zip` artifacts plus matching `.sha256` files from all platform jobs.
+- The `github-release-publish` job creates a GitHub release when the tag is new, or uploads with overwrite semantics when the release already exists.
+- GitHub release publication is fail-closed:
+  - missing artifacts block publication
+  - missing checksums block publication
+  - missing GitHub token blocks publication
+- Publication must never proceed on branch-only pipelines without an explicit version tag.
 
 ## Checksums and Integrity
 
@@ -61,10 +75,12 @@ This feature makes the CircleCI build matrix, packaging rules, artifact integrit
 
 ## Expected Release Artifacts
 
-- Platform build summary covering Linux and macOS
+- Platform build summary covering Linux, macOS, and Windows
 - Linux `.deb` package and checksum
 - Packaged release archive for macOS target
+- Packaged release `.zip` for Windows target
 - Artifact upload summary showing where each packaged binary was published
+- GitHub release URL containing Linux/macOS/Windows binaries and checksums
 - Checksum manifest for all packaged artifacts
 - Smoke test results for each matrix entry
 - Release gate summary showing whether publication was approved or blocked

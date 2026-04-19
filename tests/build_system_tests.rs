@@ -30,6 +30,11 @@ fn assert_has_build_system_language(path: &Path) {
         path.display()
     );
     assert!(
+        contains_case_insensitive(&content, "windows"),
+        "{} must mention Windows",
+        path.display()
+    );
+    assert!(
         contains_case_insensitive(&content, "build matrix"),
         "{} must mention a build matrix",
         path.display()
@@ -67,6 +72,10 @@ fn circleci_cross_platform_workflow_exists_and_has_required_jobs() {
         "CircleCI config must define cross-platform workflow"
     );
     assert!(
+        contains_case_insensitive(&config, "release-github-assets"),
+        "CircleCI config must define a tag-driven release workflow"
+    );
+    assert!(
         contains_case_insensitive(&config, "linux-build-package"),
         "CircleCI config must define linux build/package job"
     );
@@ -75,8 +84,12 @@ fn circleci_cross_platform_workflow_exists_and_has_required_jobs() {
         "CircleCI config must define macOS build/package job"
     );
     assert!(
-        !contains_case_insensitive(&config, "windows-build-package"),
-        "CircleCI config must not define windows build/package jobs when windows is unsupported"
+        contains_case_insensitive(&config, "windows-build-package"),
+        "CircleCI config must define windows build/package job"
+    );
+    assert!(
+        contains_case_insensitive(&config, "github-release-publish"),
+        "CircleCI config must define a GitHub release publish job"
     );
     assert!(
         contains_case_insensitive(&config, "cargo test --locked"),
@@ -95,8 +108,52 @@ fn circleci_cross_platform_workflow_exists_and_has_required_jobs() {
         "CircleCI cross-platform jobs must store packaged artifacts"
     );
     assert!(
+        contains_case_insensitive(&config, "persist_to_workspace"),
+        "CircleCI cross-platform jobs must persist packaged artifacts to workspace for release publication"
+    );
+    assert!(
+        contains_case_insensitive(&config, "attach_workspace"),
+        "CircleCI release publish job must attach workspace artifacts"
+    );
+    assert!(
         contains_case_insensitive(&config, "scripts/release/package-artifacts-deb.sh"),
         "CircleCI linux workflow must package artifacts as a .deb"
+    );
+    assert!(
+        contains_case_insensitive(&config, "scripts/release/package-artifacts.ps1"),
+        "CircleCI windows workflow must package artifacts via PowerShell script"
+    );
+    assert!(
+        contains_case_insensitive(&config, ".zip"),
+        "CircleCI windows workflow must verify packaged zip artifacts"
+    );
+    assert!(
+        contains_case_insensitive(&config, ".tar.gz.sha256"),
+        "CircleCI release publication must include macOS checksums"
+    );
+    assert!(
+        contains_case_insensitive(&config, ".deb.sha256"),
+        "CircleCI release publication must include Linux checksums"
+    );
+    assert!(
+        contains_case_insensitive(&config, ".zip.sha256"),
+        "CircleCI release publication must include Windows checksums"
+    );
+    assert!(
+        contains_case_insensitive(&config, "gh release create"),
+        "CircleCI release publish job must create a GitHub release when missing"
+    );
+    assert!(
+        contains_case_insensitive(&config, "gh release upload"),
+        "CircleCI release publish job must upload artifacts to GitHub releases"
+    );
+    assert!(
+        contains_case_insensitive(&config, "circle_tag"),
+        "CircleCI release publish logic must be tag-driven"
+    );
+    assert!(
+        contains_case_insensitive(&config, "/^v.*/"),
+        "CircleCI release workflow must be filtered to version tags"
     );
     assert!(
         contains_case_insensitive(&config, "-name \"*.deb\""),
@@ -147,6 +204,7 @@ fn packaging_scripts_generate_sha256_checksums() {
     let root = repo_root();
     let shell_script = read_text(&root.join("scripts/release/package-artifacts.sh"));
     let deb_script = read_text(&root.join("scripts/release/package-artifacts-deb.sh"));
+    let powershell_script = read_text(&root.join("scripts/release/package-artifacts.ps1"));
 
     assert!(
         contains_case_insensitive(&shell_script, ".sha256"),
@@ -164,6 +222,38 @@ fn packaging_scripts_generate_sha256_checksums() {
     assert!(
         contains_case_insensitive(&deb_script, "dpkg-deb --build"),
         "linux deb packaging script must build a .deb package"
+    );
+    assert!(
+        contains_case_insensitive(&powershell_script, ".sha256"),
+        "windows packaging script must emit sha256 files"
+    );
+    assert!(
+        contains_case_insensitive(&powershell_script, "get-filehash"),
+        "windows packaging script must compute SHA256 digests"
+    );
+    assert!(
+        contains_case_insensitive(&powershell_script, "Add-Type -AssemblyName System.IO.Compression"),
+        "windows packaging script must load System.IO.Compression so ZipArchiveMode resolves in Windows PowerShell"
+    );
+    assert!(
+        !contains_case_insensitive(&powershell_script, "1970-01-01T00:00:00"),
+        "windows packaging script must not use 1970 ZIP timestamps because ZIP format requires 1980+ entry timestamps"
+    );
+    assert!(
+        contains_case_insensitive(&powershell_script, "1980-01-01T00:00:00"),
+        "windows packaging script must use a deterministic ZIP-safe timestamp"
+    );
+    assert!(
+        contains_case_insensitive(&powershell_script, ".zip"),
+        "windows packaging script must emit zip artifacts"
+    );
+    assert!(
+        !contains_case_insensitive(&powershell_script, "[System.IO.Path]::GetRelativePath"),
+        "windows packaging script must avoid Path.GetRelativePath because it is unavailable in older Windows PowerShell/.NET runtimes"
+    );
+    assert!(
+        contains_case_insensitive(&powershell_script, "MakeRelativeUri"),
+        "windows packaging script should use a compatibility-safe relative path implementation"
     );
     assert!(
         contains_case_insensitive(&deb_script, "/usr/bin/prune-guard"),
@@ -317,8 +407,18 @@ fn build_docs_exist_and_cover_required_release_steps() {
         docs_build.display()
     );
     assert!(
+        contains_case_insensitive(&docs_content, "windows"),
+        "{} must document windows packaging/build behavior",
+        docs_build.display()
+    );
+    assert!(
         contains_case_insensitive(&docs_content, "checksums and integrity"),
         "{} must include a checksum section",
+        docs_build.display()
+    );
+    assert!(
+        contains_case_insensitive(&docs_content, "github release"),
+        "{} must document GitHub release publication",
         docs_build.display()
     );
     assert!(
@@ -350,8 +450,18 @@ fn build_docs_exist_and_cover_required_release_steps() {
         flowchart_build.display()
     );
     assert!(
+        contains_case_insensitive(&flow_content, "github release"),
+        "{} must include GitHub release publication flow language",
+        flowchart_build.display()
+    );
+    assert!(
         contains_case_insensitive(&flow_content, ".deb"),
         "{} must document linux .deb packaging flow",
+        flowchart_build.display()
+    );
+    assert!(
+        contains_case_insensitive(&flow_content, "windows"),
+        "{} must document windows build/package flow",
         flowchart_build.display()
     );
     assert!(

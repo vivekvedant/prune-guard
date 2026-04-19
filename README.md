@@ -19,7 +19,7 @@ It reclaims disk space by removing unused artifacts while defaulting to conserva
 - Docker and Podman backend adapters
 - Reliability controls (retries, lock, no-op on full backend failure)
 - Observability/security preflight checks
-- Cross-platform build and packaging pipeline (Linux/macOS)
+- Cross-platform build and packaging pipeline (Linux/macOS/Windows)
 - Linux `.deb` install path with `systemd` daemon service (`prune-guard.service`) and bootstrap timer (`prune-guard.timer`)
 
 ## Project Structure

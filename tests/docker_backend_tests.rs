@@ -102,6 +102,38 @@ fn docker_usage_collection_reads_docker_root_df_usage() {
 }
 
 #[test]
+fn docker_usage_collection_falls_back_to_powershell_on_windows_root() {
+    let runner = FakeRunner::new(vec![
+        ok(
+            "docker|info|--format|{{.DockerRootDir}}",
+            "C:\\ProgramData\\docker\n",
+        ),
+        err(
+            "df|-B1|--output=used,size|C:\\ProgramData\\docker",
+            "failed to execute `df`: program not found",
+        ),
+        ok(
+            "powershell|-NoProfile|-NonInteractive|-Command|$d=Get-PSDrive -Name C; if ($null -eq $d) { exit 1 }; Write-Output ($d.Used); Write-Output ($d.Used + $d.Free)",
+            "1000000000\n4000000000\n",
+        ),
+    ]);
+    let backend = DockerBackend::with_runner(runner.clone());
+
+    let usage = backend
+        .collect_usage()
+        .expect("usage should parse from windows powershell fallback");
+
+    assert_eq!(usage.backend, BackendKind::Docker);
+    assert_eq!(usage.used_bytes, 1_000_000_000);
+    assert_eq!(usage.total_bytes, Some(4_000_000_000));
+    assert_eq!(usage.used_percent, Some(25));
+    assert!(
+        runner.calls().iter().any(|call| call.contains("powershell")),
+        "windows fallback should invoke powershell usage probe"
+    );
+}
+
+#[test]
 fn discovery_marks_running_referenced_and_attached_resources_as_unsafe() {
     let runner = FakeRunner::new(vec![
         ok(
