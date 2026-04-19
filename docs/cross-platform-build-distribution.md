@@ -30,6 +30,7 @@ This feature makes the CircleCI build matrix, packaging rules, artifact integrit
 - Windows `.exe` installers are compiled from `packaging/windows/prune-guard-installer.iss`.
 - Windows installer flow must use the classic wizard style so users get explicit Next-button navigation.
 - Windows installer flow must show an explicit optional task to add the install directory (binary path) to system `PATH`.
+- Windows packaging must canonicalize the installer output directory before invoking ISCC so artifact verification uses the same path in CI.
 - Windows packaging must include `prune-guard.exe`, release metadata, installer payload, and checksum files.
 - Packaging must keep the release payload minimal and deterministic.
 - Artifact upload must happen only after the packaged bytes and checksum manifest are ready.
