@@ -318,6 +318,87 @@ jobs:
           path: dist
           destination: prune-guard-macos
 
+  windows-build-package:
+    machine:
+      image: windows-server-2022-gui:current
+    resource_class: windows.medium
+    shell: powershell.exe -ExecutionPolicy Bypass
+    steps:
+      - checkout
+
+      - run:
+          name: Install Rust if missing
+          command: |
+            if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) {
+              Invoke-WebRequest -Uri https://win.rustup.rs/x86_64 -OutFile rustup-init.exe
+              .\rustup-init.exe -y --profile minimal --default-toolchain stable
+            }
+            $env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
+            cargo --version
+            rustc --version
+
+      - run:
+          name: Run tests
+          command: |
+            $env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
+            cargo test --locked
+
+      - run:
+          name: Build release
+          command: |
+            $env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
+            cargo build --release --locked
+
+      - run:
+          name: Smoke test release outputs
+          command: |
+            if (-not (Test-Path -LiteralPath "target\release")) {
+              throw "Release directory missing: target\release"
+            }
+
+            $firstReleaseFile = Get-ChildItem -LiteralPath "target\release" -Recurse -File |
+              Where-Object { $_.Length -gt 0 } |
+              Select-Object -First 1
+            if (-not $firstReleaseFile) {
+              throw "Release directory does not contain any non-empty files."
+            }
+
+      - run:
+          name: Package artifacts
+          command: |
+            $env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
+            powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release/package-artifacts.ps1 `
+              -WorkspaceRoot $PWD `
+              -OutputDir dist
+
+      - run:
+          name: Verify packaged artifacts
+          command: |
+            $archivePath = Get-ChildItem -LiteralPath dist -Filter *.zip -File | Select-Object -First 1
+            if (-not $archivePath -or $archivePath.Length -le 0) {
+              throw "Packaged archive is missing or empty."
+            }
+
+            $checksumPath = "$($archivePath.FullName).sha256"
+            if (-not (Test-Path -LiteralPath $checksumPath)) {
+              throw "Checksum file is missing."
+            }
+            if ((Get-Item -LiteralPath $checksumPath).Length -le 0) {
+              throw "Checksum file is empty."
+            }
+
+            $verifyDir = Join-Path $env:TEMP "prune-guard-verify-$([Guid]::NewGuid().ToString('N'))"
+            New-Item -ItemType Directory -Force -Path $verifyDir | Out-Null
+            try {
+              Expand-Archive -LiteralPath $archivePath.FullName -DestinationPath $verifyDir -Force
+            } finally {
+              Remove-Item -LiteralPath $verifyDir -Recurse -Force -ErrorAction SilentlyContinue
+            }
+
+      - store_artifacts:
+          path: dist
+          destination: prune-guard-windows
+
 workflows:
   version: 2
   pr-main-tests:
@@ -333,6 +414,10 @@ workflows:
             branches:
               ignore: main
       - macos-build-package:
+          filters:
+            branches:
+              ignore: main
+      - windows-build-package:
           filters:
             branches:
               ignore: main

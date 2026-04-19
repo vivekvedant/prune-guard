@@ -30,6 +30,11 @@ fn assert_has_build_system_language(path: &Path) {
         path.display()
     );
     assert!(
+        contains_case_insensitive(&content, "windows"),
+        "{} must mention Windows",
+        path.display()
+    );
+    assert!(
         contains_case_insensitive(&content, "build matrix"),
         "{} must mention a build matrix",
         path.display()
@@ -75,8 +80,8 @@ fn circleci_cross_platform_workflow_exists_and_has_required_jobs() {
         "CircleCI config must define macOS build/package job"
     );
     assert!(
-        !contains_case_insensitive(&config, "windows-build-package"),
-        "CircleCI config must not define windows build/package jobs when windows is unsupported"
+        contains_case_insensitive(&config, "windows-build-package"),
+        "CircleCI config must define windows build/package job"
     );
     assert!(
         contains_case_insensitive(&config, "cargo test --locked"),
@@ -97,6 +102,14 @@ fn circleci_cross_platform_workflow_exists_and_has_required_jobs() {
     assert!(
         contains_case_insensitive(&config, "scripts/release/package-artifacts-deb.sh"),
         "CircleCI linux workflow must package artifacts as a .deb"
+    );
+    assert!(
+        contains_case_insensitive(&config, "scripts/release/package-artifacts.ps1"),
+        "CircleCI windows workflow must package artifacts via PowerShell script"
+    );
+    assert!(
+        contains_case_insensitive(&config, ".zip"),
+        "CircleCI windows workflow must verify packaged zip artifacts"
     );
     assert!(
         contains_case_insensitive(&config, "-name \"*.deb\""),
@@ -147,6 +160,7 @@ fn packaging_scripts_generate_sha256_checksums() {
     let root = repo_root();
     let shell_script = read_text(&root.join("scripts/release/package-artifacts.sh"));
     let deb_script = read_text(&root.join("scripts/release/package-artifacts-deb.sh"));
+    let powershell_script = read_text(&root.join("scripts/release/package-artifacts.ps1"));
 
     assert!(
         contains_case_insensitive(&shell_script, ".sha256"),
@@ -164,6 +178,18 @@ fn packaging_scripts_generate_sha256_checksums() {
     assert!(
         contains_case_insensitive(&deb_script, "dpkg-deb --build"),
         "linux deb packaging script must build a .deb package"
+    );
+    assert!(
+        contains_case_insensitive(&powershell_script, ".sha256"),
+        "windows packaging script must emit sha256 files"
+    );
+    assert!(
+        contains_case_insensitive(&powershell_script, "get-filehash"),
+        "windows packaging script must compute SHA256 digests"
+    );
+    assert!(
+        contains_case_insensitive(&powershell_script, ".zip"),
+        "windows packaging script must emit zip artifacts"
     );
     assert!(
         contains_case_insensitive(&deb_script, "/usr/bin/prune-guard"),
@@ -317,6 +343,11 @@ fn build_docs_exist_and_cover_required_release_steps() {
         docs_build.display()
     );
     assert!(
+        contains_case_insensitive(&docs_content, "windows"),
+        "{} must document windows packaging/build behavior",
+        docs_build.display()
+    );
+    assert!(
         contains_case_insensitive(&docs_content, "checksums and integrity"),
         "{} must include a checksum section",
         docs_build.display()
@@ -352,6 +383,11 @@ fn build_docs_exist_and_cover_required_release_steps() {
     assert!(
         contains_case_insensitive(&flow_content, ".deb"),
         "{} must document linux .deb packaging flow",
+        flowchart_build.display()
+    );
+    assert!(
+        contains_case_insensitive(&flow_content, "windows"),
+        "{} must document windows build/package flow",
         flowchart_build.display()
     );
     assert!(

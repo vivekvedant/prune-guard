@@ -5,7 +5,7 @@ This guide covers the minimal steps to build, validate, and package `prune-guard
 ## Prerequisites
 
 - Rust toolchain installed (`rustup`, `cargo`)
-- Linux or macOS shell environment
+- Linux, macOS, or Windows shell environment
 - Optional backend CLIs for runtime checks:
   - Docker (`docker`)
   - Podman (`podman`)
@@ -125,6 +125,29 @@ Optional one-shot dry-run smoke test using the install config template:
 
 ```bash
 ./target/release/prune-guard --config config/prune-guard.toml --once
+```
+
+## Create Windows Package (`.zip`)
+
+Windows packaging is supported on Windows hosts with PowerShell.
+
+1. Build release artifacts:
+
+```powershell
+cargo build --release --locked
+```
+
+2. Package release artifacts and checksum:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release/package-artifacts.ps1 -WorkspaceRoot $PWD -OutputDir dist
+```
+
+Expected outputs:
+
+```text
+dist/prune-guard_<host-triple>.zip
+dist/prune-guard_<host-triple>.zip.sha256
 ```
 
 ## Docker Storage Growth Helper
