@@ -126,6 +126,7 @@ if (-not (Test-Path -LiteralPath $installerScriptPath)) {
 }
 
 New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
+$resolvedOutputDir = (Resolve-Path -LiteralPath $OutputDir).Path
 
 $stagingRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("prune-guard-package-{0}" -f [System.Guid]::NewGuid().ToString('N'))
 $packageName = "prune-guard-$hostTriple"
@@ -153,7 +154,7 @@ Get-ChildItem -LiteralPath $packageRoot -Recurse -Force | ForEach-Object {
   }
 }
 
-$archivePath = Join-Path $OutputDir ("$packageName.zip")
+$archivePath = Join-Path $resolvedOutputDir ("$packageName.zip")
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 Add-Type -AssemblyName System.IO.Compression
@@ -218,7 +219,7 @@ finally {
 $zipChecksumPath = Write-Sha256Manifest -ArtifactPath $archivePath
 
 $installerBaseName = "prune-guard-$hostTriple-setup"
-$installerPath = Join-Path $OutputDir ("$installerBaseName.exe")
+$installerPath = Join-Path $resolvedOutputDir ("$installerBaseName.exe")
 if (Test-Path -LiteralPath $installerPath) {
   Remove-Item -LiteralPath $installerPath -Force
 }
@@ -227,7 +228,7 @@ $isccPath = Resolve-InnoSetupCompiler
 $isccArgs = @(
   "/DSourceBinary=$daemonBinaryPath"
   "/DSourceReadme=$readmePath"
-  "/DInstallerOutputDir=$OutputDir"
+  "/DInstallerOutputDir=$resolvedOutputDir"
   "/DInstallerBaseName=$installerBaseName"
   "/DAppVersion=$appVersion"
   $installerScriptPath

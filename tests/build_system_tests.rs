@@ -260,6 +260,14 @@ fn packaging_scripts_generate_sha256_checksums() {
         "windows packaging script must emit installer exe artifacts"
     );
     assert!(
+        contains_case_insensitive(&powershell_script, "resolve-path -literalpath $outputdir"),
+        "windows packaging script must canonicalize output dir before invoking iscc to avoid relative-path output drift"
+    );
+    assert!(
+        contains_case_insensitive(&powershell_script, "/dinstalleroutputdir=$resolvedoutputdir"),
+        "windows packaging script must pass canonical installer output dir into iscc"
+    );
+    assert!(
         !contains_case_insensitive(&powershell_script, "[System.IO.Path]::GetRelativePath"),
         "windows packaging script must avoid Path.GetRelativePath because it is unavailable in older Windows PowerShell/.NET runtimes"
     );
