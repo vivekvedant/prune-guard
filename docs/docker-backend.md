@@ -19,6 +19,17 @@ The implementation is in `src/docker_backend.rs`.
   - `[docker].host`
   - `[docker].context`
 - Exactly one may be set; setting both is rejected during config validation (fail-closed).
+- When neither override is set, startup attempts host auto-detection from known local socket paths:
+  - `unix:///var/run/docker.sock`
+  - `unix:///run/docker.sock`
+  - `unix://$HOME/.docker/desktop/docker.sock`
+  - `unix:///home/*/.docker/desktop/docker.sock`
+- Each discovered candidate is probed with `docker --host <candidate> version --format {{.Server.Version}}`.
+- If exactly one Docker Desktop socket candidate is reachable, that endpoint is selected even when other non-Desktop sockets are reachable.
+- Ambiguous auto-detection still fails closed:
+  - multiple reachable Docker Desktop sockets
+  - multiple reachable non-Desktop sockets when no Desktop socket is reachable
+- On fail-closed ambiguity, startup requires explicit `docker.host` or `docker.context` in TOML.
 - When set, the backend prepends the corresponding global CLI flag to every Docker command:
   - `--host <value>`
   - `--context <value>`

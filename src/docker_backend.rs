@@ -5,6 +5,8 @@ use crate::domain::{
 };
 use crate::error::{CleanupError, Result};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::fs;
+use std::path::Path;
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -69,8 +71,17 @@ impl DockerBackend<OsCommandRunner> {
         Self::with_runner(OsCommandRunner)
     }
 
-    pub fn with_connection(host: Option<String>, context: Option<String>) -> Self {
-        Self::with_runner_and_connection(OsCommandRunner, host, context)
+    pub fn with_connection(
+        host: Option<String>,
+        context: Option<String>,
+    ) -> std::result::Result<Self, String> {
+        let (resolved_host, resolved_context) =
+            resolve_docker_connection_from_environment(&OsCommandRunner, host, context)?;
+        Ok(Self::with_runner_and_connection(
+            OsCommandRunner,
+            resolved_host,
+            resolved_context,
+        ))
     }
 }
 
@@ -425,6 +436,150 @@ fn normalize_non_empty(value: Option<String>) -> Option<String> {
             Some(trimmed.to_string())
         }
     })
+}
+
+fn resolve_docker_connection_from_environment<R: CommandRunner>(
+    runner: &R,
+    host: Option<String>,
+    context: Option<String>,
+) -> std::result::Result<(Option<String>, Option<String>), String> {
+    let auto_detect_candidates = discover_auto_detect_candidate_hosts();
+    resolve_docker_connection(runner, host, context, &auto_detect_candidates)
+}
+
+fn resolve_docker_connection<R: CommandRunner>(
+    runner: &R,
+    host: Option<String>,
+    context: Option<String>,
+    auto_detect_candidates: &[String],
+) -> std::result::Result<(Option<String>, Option<String>), String> {
+    let host = normalize_non_empty(host);
+    let context = normalize_non_empty(context);
+    if host.is_some() && context.is_some() {
+        return Err("docker.host and docker.context cannot both be set".to_string());
+    }
+
+    if host.is_some() || context.is_some() {
+        return Ok((host, context));
+    }
+
+    // Safety-critical behavior:
+    // auto-detect only when exactly one reachable endpoint is proven.
+    // If multiple endpoints are reachable, fail closed and require explicit config.
+    let detected_host = select_reachable_auto_detected_host(runner, auto_detect_candidates)?;
+    Ok((detected_host, None))
+}
+
+fn select_reachable_auto_detected_host<R: CommandRunner>(
+    runner: &R,
+    auto_detect_candidates: &[String],
+) -> std::result::Result<Option<String>, String> {
+    let mut reachable_hosts = Vec::new();
+    for host in auto_detect_candidates {
+        let output = runner.run(
+            "docker",
+            &["--host", host, "version", "--format", "{{.Server.Version}}"],
+        );
+        if let Ok(version) = output {
+            if !version.trim().is_empty() {
+                reachable_hosts.push(host.clone());
+            }
+        }
+    }
+
+    if reachable_hosts.is_empty() {
+        return Ok(None);
+    }
+
+    let mut reachable_desktop_hosts = Vec::new();
+    let mut reachable_non_desktop_hosts = Vec::new();
+    for host in reachable_hosts {
+        if is_docker_desktop_host(host.as_str()) {
+            reachable_desktop_hosts.push(host);
+        } else {
+            reachable_non_desktop_hosts.push(host);
+        }
+    }
+
+    // Safety-critical endpoint routing:
+    // if Docker Desktop is reachable, prefer it only when a single desktop
+    // endpoint is unambiguous. Any ambiguous set still fails closed.
+    match reachable_desktop_hosts.len() {
+        1 => return Ok(reachable_desktop_hosts.into_iter().next()),
+        2.. => {
+            return Err(format!(
+                "multiple reachable Docker Desktop hosts were auto-detected ({}); configure exactly one via `docker.host` or `docker.context`",
+                reachable_desktop_hosts.join(", ")
+            ));
+        }
+        _ => {}
+    }
+
+    match reachable_non_desktop_hosts.len() {
+        1 => Ok(reachable_non_desktop_hosts.into_iter().next()),
+        _ => Err(format!(
+            "multiple reachable Docker hosts were auto-detected ({}); configure exactly one via `docker.host` or `docker.context`",
+            reachable_non_desktop_hosts.join(", ")
+        )),
+    }
+}
+
+fn is_docker_desktop_host(host: &str) -> bool {
+    host.ends_with("/.docker/desktop/docker.sock")
+}
+
+fn discover_auto_detect_candidate_hosts() -> Vec<String> {
+    let mut hosts = BTreeSet::new();
+    push_unix_socket_host_candidate(Path::new("/var/run/docker.sock"), &mut hosts);
+    push_unix_socket_host_candidate(Path::new("/run/docker.sock"), &mut hosts);
+
+    if let Ok(home) = std::env::var("HOME") {
+        let home = home.trim();
+        if !home.is_empty() {
+            let desktop_socket = Path::new(home).join(".docker/desktop/docker.sock");
+            push_unix_socket_host_candidate(&desktop_socket, &mut hosts);
+        }
+    }
+
+    if let Ok(home_entries) = fs::read_dir("/home") {
+        for entry in home_entries.flatten() {
+            let desktop_socket = entry.path().join(".docker/desktop/docker.sock");
+            push_unix_socket_host_candidate(&desktop_socket, &mut hosts);
+        }
+    }
+
+    hosts.into_iter().collect()
+}
+
+fn push_unix_socket_host_candidate(path: &Path, hosts: &mut BTreeSet<String>) {
+    if let Some(host) = unix_socket_host_uri(path) {
+        hosts.insert(host);
+    }
+}
+
+fn unix_socket_host_uri(path: &Path) -> Option<String> {
+    if !is_unix_socket(path) {
+        return None;
+    }
+
+    let canonical = fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    Some(format!("unix://{}", canonical.display()))
+}
+
+fn is_unix_socket(path: &Path) -> bool {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::FileTypeExt;
+        return fs::metadata(path)
+            .map(|metadata| metadata.file_type().is_socket())
+            .unwrap_or(false);
+    }
+
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+        false
+    }
 }
 
 fn is_missing_container_error(message: &str) -> bool {
@@ -1231,4 +1386,217 @@ fn non_empty_lines(output: &str) -> Vec<&str> {
 
 fn first_non_empty_line(output: &str) -> Option<&str> {
     output.lines().map(str::trim).find(|line| !line.is_empty())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::VecDeque;
+    use std::sync::{Arc, Mutex};
+
+    #[test]
+    fn resolve_connection_uses_explicit_host_without_autodetection() {
+        let runner = FakeRunner::new(vec![]);
+
+        let (host, context) = resolve_docker_connection(
+            &runner,
+            Some("unix:///custom/docker.sock".to_string()),
+            None,
+            &[
+                "unix:///var/run/docker.sock".to_string(),
+                "unix:///home/vivek/.docker/desktop/docker.sock".to_string(),
+            ],
+        )
+        .expect("configured host should bypass auto-detection");
+
+        assert_eq!(host.as_deref(), Some("unix:///custom/docker.sock"));
+        assert_eq!(context, None);
+        assert!(runner.calls().is_empty());
+    }
+
+    #[test]
+    fn resolve_connection_auto_detects_single_reachable_host() {
+        let runner = FakeRunner::new(vec![
+            ok(
+                "docker|--host|unix:///home/vivek/.docker/desktop/docker.sock|version|--format|{{.Server.Version}}",
+                "27.1.0\n",
+            ),
+            err(
+                "docker|--host|unix:///var/run/docker.sock|version|--format|{{.Server.Version}}",
+                "Cannot connect",
+            ),
+        ]);
+
+        let (host, context) = resolve_docker_connection(
+            &runner,
+            None,
+            None,
+            &[
+                "unix:///home/vivek/.docker/desktop/docker.sock".to_string(),
+                "unix:///var/run/docker.sock".to_string(),
+            ],
+        )
+        .expect("single reachable host should be auto-detected");
+
+        assert_eq!(
+            host.as_deref(),
+            Some("unix:///home/vivek/.docker/desktop/docker.sock")
+        );
+        assert_eq!(context, None);
+    }
+
+    #[test]
+    fn resolve_connection_fails_closed_when_multiple_non_desktop_hosts_are_reachable() {
+        let runner = FakeRunner::new(vec![
+            ok(
+                "docker|--host|unix:///var/run/docker.sock|version|--format|{{.Server.Version}}",
+                "27.1.0\n",
+            ),
+            ok(
+                "docker|--host|unix:///run/docker.sock|version|--format|{{.Server.Version}}",
+                "27.1.0\n",
+            ),
+        ]);
+
+        let error = resolve_docker_connection(
+            &runner,
+            None,
+            None,
+            &[
+                "unix:///var/run/docker.sock".to_string(),
+                "unix:///run/docker.sock".to_string(),
+            ],
+        )
+        .expect_err("multiple non-desktop reachable endpoints must fail closed");
+
+        assert!(error.contains("multiple reachable Docker hosts"));
+        assert!(error.contains("docker.host"));
+        assert!(error.contains("docker.context"));
+    }
+
+    #[test]
+    fn resolve_connection_prefers_desktop_host_when_multiple_hosts_are_reachable() {
+        let runner = FakeRunner::new(vec![
+            ok(
+                "docker|--host|unix:///home/vivek/.docker/desktop/docker.sock|version|--format|{{.Server.Version}}",
+                "27.1.0\n",
+            ),
+            ok(
+                "docker|--host|unix:///run/docker.sock|version|--format|{{.Server.Version}}",
+                "27.1.0\n",
+            ),
+        ]);
+
+        let (host, context) = resolve_docker_connection(
+            &runner,
+            None,
+            None,
+            &[
+                "unix:///home/vivek/.docker/desktop/docker.sock".to_string(),
+                "unix:///run/docker.sock".to_string(),
+            ],
+        )
+        .expect("desktop host should be preferred deterministically");
+
+        assert_eq!(
+            host.as_deref(),
+            Some("unix:///home/vivek/.docker/desktop/docker.sock")
+        );
+        assert_eq!(context, None);
+    }
+
+    #[test]
+    fn resolve_connection_fails_closed_when_multiple_desktop_hosts_are_reachable() {
+        let runner = FakeRunner::new(vec![
+            ok(
+                "docker|--host|unix:///home/vivek/.docker/desktop/docker.sock|version|--format|{{.Server.Version}}",
+                "27.1.0\n",
+            ),
+            ok(
+                "docker|--host|unix:///home/alice/.docker/desktop/docker.sock|version|--format|{{.Server.Version}}",
+                "27.1.0\n",
+            ),
+        ]);
+
+        let error = resolve_docker_connection(
+            &runner,
+            None,
+            None,
+            &[
+                "unix:///home/vivek/.docker/desktop/docker.sock".to_string(),
+                "unix:///home/alice/.docker/desktop/docker.sock".to_string(),
+            ],
+        )
+        .expect_err("multiple desktop hosts should remain fail-closed");
+
+        assert!(error.contains("multiple reachable Docker Desktop hosts"));
+        assert!(error.contains("docker.host"));
+        assert!(error.contains("docker.context"));
+    }
+
+    #[derive(Clone, Default)]
+    struct FakeRunner {
+        expectations: Arc<Mutex<VecDeque<ExpectedCommand>>>,
+        calls: Arc<Mutex<Vec<String>>>,
+    }
+
+    #[derive(Clone)]
+    struct ExpectedCommand {
+        key: String,
+        output: std::result::Result<String, String>,
+    }
+
+    impl FakeRunner {
+        fn new(expectations: Vec<ExpectedCommand>) -> Self {
+            Self {
+                expectations: Arc::new(Mutex::new(VecDeque::from(expectations))),
+                calls: Arc::new(Mutex::new(Vec::new())),
+            }
+        }
+
+        fn calls(&self) -> Vec<String> {
+            self.calls.lock().expect("calls lock poisoned").clone()
+        }
+    }
+
+    impl CommandRunner for FakeRunner {
+        fn run(&self, program: &str, args: &[&str]) -> std::result::Result<String, String> {
+            let key = command_key(program, args);
+            self.calls
+                .lock()
+                .expect("calls lock poisoned")
+                .push(key.clone());
+
+            let mut queue = self
+                .expectations
+                .lock()
+                .expect("expectations lock poisoned");
+            let expected = queue
+                .pop_front()
+                .unwrap_or_else(|| panic!("unexpected command invocation: {key}"));
+            assert_eq!(expected.key, key, "command mismatch");
+            expected.output
+        }
+    }
+
+    fn ok(key: &str, output: &str) -> ExpectedCommand {
+        ExpectedCommand {
+            key: key.to_string(),
+            output: Ok(output.to_string()),
+        }
+    }
+
+    fn err(key: &str, message: &str) -> ExpectedCommand {
+        ExpectedCommand {
+            key: key.to_string(),
+            output: Err(message.to_string()),
+        }
+    }
+
+    fn command_key(program: &str, args: &[&str]) -> String {
+        std::iter::once(program)
+            .chain(args.iter().copied())
+            .collect::<Vec<_>>()
+            .join("|")
+    }
 }
