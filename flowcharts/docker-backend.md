@@ -10,12 +10,17 @@ flowchart TD
     B -- No, both set --> C[Config validation fails closed]
     B -- Yes --> D[Build docker CLI global args]
     B -- None --> F[Probe known local socket endpoints with docker version]
-    F --> G{Exactly one reachable socket host?}
-    G -- Yes --> H[Use detected --host endpoint]
-    G -- No, none reachable --> D
-    G -- No, multiple reachable --> I[Fail closed and require explicit docker.host or docker.context]
+    F --> G{Exactly one reachable Desktop socket host?}
+    G -- Yes --> H[Use detected Desktop --host endpoint]
+    G -- No --> J{Any Desktop reachable?}
+    J -- Yes, multiple --> I[Fail closed and require explicit docker.host or docker.context]
+    J -- No --> K{Exactly one reachable non-Desktop socket host?}
+    K -- Yes --> L[Use detected non-Desktop --host endpoint]
+    K -- No, none reachable --> D
+    K -- No, multiple reachable --> I
     D --> E[Prefix every docker command with --host or --context when configured]
     H --> E
+    L --> E
 ```
 
 ## Discovery Safety Flow

@@ -111,7 +111,7 @@ host = "unix:///home/<user>/.docker/desktop/docker.sock"
 # context = "desktop-linux"
 ```
 
-If both are unset, prune-guard auto-detects known local Docker socket paths and uses the host only when exactly one endpoint is reachable. If multiple endpoints are reachable, startup fails closed until you set `docker.host` or `docker.context`.
+If both are unset, prune-guard auto-detects known local Docker socket paths. A single reachable Docker Desktop socket is prioritized automatically; otherwise ambiguous Desktop or non-Desktop endpoint sets fail closed until you set `docker.host` or `docker.context`.
 
 ## Smoke Test
 

@@ -25,8 +25,11 @@ The implementation is in `src/docker_backend.rs`.
   - `unix://$HOME/.docker/desktop/docker.sock`
   - `unix:///home/*/.docker/desktop/docker.sock`
 - Each discovered candidate is probed with `docker --host <candidate> version --format {{.Server.Version}}`.
-- Auto-detection is applied only when exactly one candidate is reachable.
-- If multiple candidates are reachable, startup fails closed and requires explicit `docker.host` or `docker.context` in TOML.
+- If exactly one Docker Desktop socket candidate is reachable, that endpoint is selected even when other non-Desktop sockets are reachable.
+- Ambiguous auto-detection still fails closed:
+  - multiple reachable Docker Desktop sockets
+  - multiple reachable non-Desktop sockets when no Desktop socket is reachable
+- On fail-closed ambiguity, startup requires explicit `docker.host` or `docker.context` in TOML.
 - When set, the backend prepends the corresponding global CLI flag to every Docker command:
   - `--host <value>`
   - `--context <value>`

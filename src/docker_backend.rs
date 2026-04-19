@@ -487,14 +487,45 @@ fn select_reachable_auto_detected_host<R: CommandRunner>(
         }
     }
 
-    match reachable_hosts.len() {
-        0 => Ok(None),
-        1 => Ok(reachable_hosts.into_iter().next()),
+    if reachable_hosts.is_empty() {
+        return Ok(None);
+    }
+
+    let mut reachable_desktop_hosts = Vec::new();
+    let mut reachable_non_desktop_hosts = Vec::new();
+    for host in reachable_hosts {
+        if is_docker_desktop_host(host.as_str()) {
+            reachable_desktop_hosts.push(host);
+        } else {
+            reachable_non_desktop_hosts.push(host);
+        }
+    }
+
+    // Safety-critical endpoint routing:
+    // if Docker Desktop is reachable, prefer it only when a single desktop
+    // endpoint is unambiguous. Any ambiguous set still fails closed.
+    match reachable_desktop_hosts.len() {
+        1 => return Ok(reachable_desktop_hosts.into_iter().next()),
+        2.. => {
+            return Err(format!(
+                "multiple reachable Docker Desktop hosts were auto-detected ({}); configure exactly one via `docker.host` or `docker.context`",
+                reachable_desktop_hosts.join(", ")
+            ));
+        }
+        _ => {}
+    }
+
+    match reachable_non_desktop_hosts.len() {
+        1 => Ok(reachable_non_desktop_hosts.into_iter().next()),
         _ => Err(format!(
             "multiple reachable Docker hosts were auto-detected ({}); configure exactly one via `docker.host` or `docker.context`",
-            reachable_hosts.join(", ")
+            reachable_non_desktop_hosts.join(", ")
         )),
     }
+}
+
+fn is_docker_desktop_host(host: &str) -> bool {
+    host.ends_with("/.docker/desktop/docker.sock")
 }
 
 fn discover_auto_detect_candidate_hosts() -> Vec<String> {
@@ -1415,14 +1446,14 @@ mod tests {
     }
 
     #[test]
-    fn resolve_connection_fails_closed_when_multiple_hosts_are_reachable() {
+    fn resolve_connection_fails_closed_when_multiple_non_desktop_hosts_are_reachable() {
         let runner = FakeRunner::new(vec![
             ok(
                 "docker|--host|unix:///var/run/docker.sock|version|--format|{{.Server.Version}}",
                 "27.1.0\n",
             ),
             ok(
-                "docker|--host|unix:///home/vivek/.docker/desktop/docker.sock|version|--format|{{.Server.Version}}",
+                "docker|--host|unix:///run/docker.sock|version|--format|{{.Server.Version}}",
                 "27.1.0\n",
             ),
         ]);
@@ -1433,12 +1464,72 @@ mod tests {
             None,
             &[
                 "unix:///var/run/docker.sock".to_string(),
-                "unix:///home/vivek/.docker/desktop/docker.sock".to_string(),
+                "unix:///run/docker.sock".to_string(),
             ],
         )
-        .expect_err("multiple reachable endpoints must fail closed");
+        .expect_err("multiple non-desktop reachable endpoints must fail closed");
 
         assert!(error.contains("multiple reachable Docker hosts"));
+        assert!(error.contains("docker.host"));
+        assert!(error.contains("docker.context"));
+    }
+
+    #[test]
+    fn resolve_connection_prefers_desktop_host_when_multiple_hosts_are_reachable() {
+        let runner = FakeRunner::new(vec![
+            ok(
+                "docker|--host|unix:///home/vivek/.docker/desktop/docker.sock|version|--format|{{.Server.Version}}",
+                "27.1.0\n",
+            ),
+            ok(
+                "docker|--host|unix:///run/docker.sock|version|--format|{{.Server.Version}}",
+                "27.1.0\n",
+            ),
+        ]);
+
+        let (host, context) = resolve_docker_connection(
+            &runner,
+            None,
+            None,
+            &[
+                "unix:///home/vivek/.docker/desktop/docker.sock".to_string(),
+                "unix:///run/docker.sock".to_string(),
+            ],
+        )
+        .expect("desktop host should be preferred deterministically");
+
+        assert_eq!(
+            host.as_deref(),
+            Some("unix:///home/vivek/.docker/desktop/docker.sock")
+        );
+        assert_eq!(context, None);
+    }
+
+    #[test]
+    fn resolve_connection_fails_closed_when_multiple_desktop_hosts_are_reachable() {
+        let runner = FakeRunner::new(vec![
+            ok(
+                "docker|--host|unix:///home/vivek/.docker/desktop/docker.sock|version|--format|{{.Server.Version}}",
+                "27.1.0\n",
+            ),
+            ok(
+                "docker|--host|unix:///home/alice/.docker/desktop/docker.sock|version|--format|{{.Server.Version}}",
+                "27.1.0\n",
+            ),
+        ]);
+
+        let error = resolve_docker_connection(
+            &runner,
+            None,
+            None,
+            &[
+                "unix:///home/vivek/.docker/desktop/docker.sock".to_string(),
+                "unix:///home/alice/.docker/desktop/docker.sock".to_string(),
+            ],
+        )
+        .expect_err("multiple desktop hosts should remain fail-closed");
+
+        assert!(error.contains("multiple reachable Docker Desktop hosts"));
         assert!(error.contains("docker.host"));
         assert!(error.contains("docker.context"));
     }
