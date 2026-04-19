@@ -34,8 +34,9 @@ flowchart TD
     B -- No --> C[Keep dry-run only]
     B -- Yes --> D{Is publication explicitly approved?}
     D -- No --> E[Remain in dry-run mode]
-    D -- Yes --> F[Publish release]
-    F --> G[Record checksums and smoke test results]
+    D -- Yes --> F[Create or update GitHub release for tag]
+    F --> G[Upload Linux macOS and Windows artifacts plus checksums]
+    G --> H[Record checksums and smoke test results]
 ```
 
 ## Safety Notes
@@ -44,5 +45,6 @@ flowchart TD
 - Any missing target or missing checksum blocks publication.
 - Linux `.deb` packaging must include only install-time payload files and must not embed the full `target/release` build tree.
 - Windows `.zip` packaging must include non-empty release binaries and checksum output.
+- GitHub release publication must run only for version tags and must fail closed when any asset is missing.
 - Any ambiguity in artifact integrity or smoke-test status must be treated as a release stop, not a warning.
 - Fail-closed release gating is required so partial platform coverage cannot be mistaken for a complete distribution.

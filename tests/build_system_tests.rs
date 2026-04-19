@@ -72,6 +72,10 @@ fn circleci_cross_platform_workflow_exists_and_has_required_jobs() {
         "CircleCI config must define cross-platform workflow"
     );
     assert!(
+        contains_case_insensitive(&config, "release-github-assets"),
+        "CircleCI config must define a tag-driven release workflow"
+    );
+    assert!(
         contains_case_insensitive(&config, "linux-build-package"),
         "CircleCI config must define linux build/package job"
     );
@@ -82,6 +86,10 @@ fn circleci_cross_platform_workflow_exists_and_has_required_jobs() {
     assert!(
         contains_case_insensitive(&config, "windows-build-package"),
         "CircleCI config must define windows build/package job"
+    );
+    assert!(
+        contains_case_insensitive(&config, "github-release-publish"),
+        "CircleCI config must define a GitHub release publish job"
     );
     assert!(
         contains_case_insensitive(&config, "cargo test --locked"),
@@ -100,6 +108,14 @@ fn circleci_cross_platform_workflow_exists_and_has_required_jobs() {
         "CircleCI cross-platform jobs must store packaged artifacts"
     );
     assert!(
+        contains_case_insensitive(&config, "persist_to_workspace"),
+        "CircleCI cross-platform jobs must persist packaged artifacts to workspace for release publication"
+    );
+    assert!(
+        contains_case_insensitive(&config, "attach_workspace"),
+        "CircleCI release publish job must attach workspace artifacts"
+    );
+    assert!(
         contains_case_insensitive(&config, "scripts/release/package-artifacts-deb.sh"),
         "CircleCI linux workflow must package artifacts as a .deb"
     );
@@ -110,6 +126,34 @@ fn circleci_cross_platform_workflow_exists_and_has_required_jobs() {
     assert!(
         contains_case_insensitive(&config, ".zip"),
         "CircleCI windows workflow must verify packaged zip artifacts"
+    );
+    assert!(
+        contains_case_insensitive(&config, ".tar.gz.sha256"),
+        "CircleCI release publication must include macOS checksums"
+    );
+    assert!(
+        contains_case_insensitive(&config, ".deb.sha256"),
+        "CircleCI release publication must include Linux checksums"
+    );
+    assert!(
+        contains_case_insensitive(&config, ".zip.sha256"),
+        "CircleCI release publication must include Windows checksums"
+    );
+    assert!(
+        contains_case_insensitive(&config, "gh release create"),
+        "CircleCI release publish job must create a GitHub release when missing"
+    );
+    assert!(
+        contains_case_insensitive(&config, "gh release upload"),
+        "CircleCI release publish job must upload artifacts to GitHub releases"
+    );
+    assert!(
+        contains_case_insensitive(&config, "circle_tag"),
+        "CircleCI release publish logic must be tag-driven"
+    );
+    assert!(
+        contains_case_insensitive(&config, "/^v.*/"),
+        "CircleCI release workflow must be filtered to version tags"
     );
     assert!(
         contains_case_insensitive(&config, "-name \"*.deb\""),
@@ -188,8 +232,20 @@ fn packaging_scripts_generate_sha256_checksums() {
         "windows packaging script must compute SHA256 digests"
     );
     assert!(
+        contains_case_insensitive(&powershell_script, "Add-Type -AssemblyName System.IO.Compression"),
+        "windows packaging script must load System.IO.Compression so ZipArchiveMode resolves in Windows PowerShell"
+    );
+    assert!(
         contains_case_insensitive(&powershell_script, ".zip"),
         "windows packaging script must emit zip artifacts"
+    );
+    assert!(
+        !contains_case_insensitive(&powershell_script, "[System.IO.Path]::GetRelativePath"),
+        "windows packaging script must avoid Path.GetRelativePath because it is unavailable in older Windows PowerShell/.NET runtimes"
+    );
+    assert!(
+        contains_case_insensitive(&powershell_script, "MakeRelativeUri"),
+        "windows packaging script should use a compatibility-safe relative path implementation"
     );
     assert!(
         contains_case_insensitive(&deb_script, "/usr/bin/prune-guard"),
@@ -353,6 +409,11 @@ fn build_docs_exist_and_cover_required_release_steps() {
         docs_build.display()
     );
     assert!(
+        contains_case_insensitive(&docs_content, "github release"),
+        "{} must document GitHub release publication",
+        docs_build.display()
+    );
+    assert!(
         contains_case_insensitive(&docs_content, "smoke test gate"),
         "{} must include a smoke-test gate section",
         docs_build.display()
@@ -378,6 +439,11 @@ fn build_docs_exist_and_cover_required_release_steps() {
     assert!(
         contains_case_insensitive(&flow_content, "release gate flow"),
         "{} must include a release gate flow",
+        flowchart_build.display()
+    );
+    assert!(
+        contains_case_insensitive(&flow_content, "github release"),
+        "{} must include GitHub release publication flow language",
         flowchart_build.display()
     );
     assert!(

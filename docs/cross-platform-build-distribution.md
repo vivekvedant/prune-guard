@@ -33,6 +33,17 @@ This feature makes the CircleCI build matrix, packaging rules, artifact integrit
 - CircleCI stores packaged artifacts per platform job so each target’s output is auditable independently.
 - Any missing artifact is treated as an incomplete release, not a partial success.
 
+## GitHub Release Publication
+
+- Release publication is tag-driven (`v*`) and runs only after Linux, macOS, and Windows packaging jobs complete successfully.
+- CircleCI collects `.deb`, `.tar.gz`, and `.zip` artifacts plus matching `.sha256` files from all platform jobs.
+- The `github-release-publish` job creates a GitHub release when the tag is new, or uploads with overwrite semantics when the release already exists.
+- GitHub release publication is fail-closed:
+  - missing artifacts block publication
+  - missing checksums block publication
+  - missing GitHub token blocks publication
+- Publication must never proceed on branch-only pipelines without an explicit version tag.
+
 ## Checksums and Integrity
 
 - Every published artifact must have a checksum entry.
@@ -69,6 +80,7 @@ This feature makes the CircleCI build matrix, packaging rules, artifact integrit
 - Packaged release archive for macOS target
 - Packaged release `.zip` for Windows target
 - Artifact upload summary showing where each packaged binary was published
+- GitHub release URL containing Linux/macOS/Windows binaries and checksums
 - Checksum manifest for all packaged artifacts
 - Smoke test results for each matrix entry
 - Release gate summary showing whether publication was approved or blocked

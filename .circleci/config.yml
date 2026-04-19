@@ -15,6 +15,11 @@ jobs:
       - run:
           name: Enforce PR-to-main guard
           command: |
+            if [ -n "${CIRCLE_TAG:-}" ]; then
+              echo "Tag pipeline detected (${CIRCLE_TAG}); bypassing PR guard."
+              exit 0
+            fi
+
             pr_url="${CIRCLE_PULL_REQUEST:-}"
             if [ -z "${pr_url}" ] && [ -n "${CIRCLE_PULL_REQUESTS:-}" ]; then
               # Some OAuth pipelines expose a comma-separated PR URL list.
@@ -78,6 +83,11 @@ jobs:
       - run:
           name: Enforce PR-to-main guard
           command: |
+            if [ -n "${CIRCLE_TAG:-}" ]; then
+              echo "Tag pipeline detected (${CIRCLE_TAG}); bypassing PR guard."
+              exit 0
+            fi
+
             pr_url="${CIRCLE_PULL_REQUEST:-}"
             if [ -z "${pr_url}" ] && [ -n "${CIRCLE_PULL_REQUESTS:-}" ]; then
               pr_url="$(printf '%s' "${CIRCLE_PULL_REQUESTS}" | cut -d',' -f1)"
@@ -208,6 +218,11 @@ jobs:
           path: dist
           destination: prune-guard-linux
 
+      - persist_to_workspace:
+          root: .
+          paths:
+            - dist
+
   macos-build-package:
     macos:
       xcode: "15.4.0"
@@ -216,6 +231,11 @@ jobs:
       - run:
           name: Enforce PR-to-main guard
           command: |
+            if [ -n "${CIRCLE_TAG:-}" ]; then
+              echo "Tag pipeline detected (${CIRCLE_TAG}); bypassing PR guard."
+              exit 0
+            fi
+
             pr_url="${CIRCLE_PULL_REQUEST:-}"
             if [ -z "${pr_url}" ] && [ -n "${CIRCLE_PULL_REQUESTS:-}" ]; then
               pr_url="$(printf '%s' "${CIRCLE_PULL_REQUESTS}" | cut -d',' -f1)"
@@ -318,6 +338,11 @@ jobs:
           path: dist
           destination: prune-guard-macos
 
+      - persist_to_workspace:
+          root: .
+          paths:
+            - dist
+
   windows-build-package:
     machine:
       image: windows-server-2022-gui:current
@@ -399,6 +424,88 @@ jobs:
           path: dist
           destination: prune-guard-windows
 
+      - persist_to_workspace:
+          root: .
+          paths:
+            - dist
+
+  github-release-publish:
+    docker:
+      - image: cimg/base:stable
+    steps:
+      - attach_workspace:
+          at: /tmp/prune-guard-workspace
+
+      - run:
+          name: Publish GitHub release assets
+          command: |
+            set -euo pipefail
+
+            if [ -z "${CIRCLE_TAG:-}" ]; then
+              echo "No tag context found; refusing release publication."
+              exit 1
+            fi
+
+            if [ -z "${GITHUB_TOKEN:-}" ]; then
+              echo "GITHUB_TOKEN is required for release publication."
+              exit 1
+            fi
+
+            if ! command -v gh >/dev/null 2>&1; then
+              sudo apt-get update
+              sudo apt-get install -y gh
+            fi
+
+            export GH_TOKEN="${GITHUB_TOKEN}"
+
+            workspace_dist="/tmp/prune-guard-workspace/dist"
+            if [ ! -d "$workspace_dist" ]; then
+              echo "Workspace dist directory missing: $workspace_dist"
+              exit 1
+            fi
+
+            linux_deb="$(find "$workspace_dist" -maxdepth 1 -type f -name "*.deb" -print -quit)"
+            linux_sha="$(find "$workspace_dist" -maxdepth 1 -type f -name "*.deb.sha256" -print -quit)"
+            mac_archive="$(find "$workspace_dist" -maxdepth 1 -type f -name "*.tar.gz" -print -quit)"
+            mac_sha="$(find "$workspace_dist" -maxdepth 1 -type f -name "*.tar.gz.sha256" -print -quit)"
+            windows_archive="$(find "$workspace_dist" -maxdepth 1 -type f -name "*.zip" -print -quit)"
+            windows_sha="$(find "$workspace_dist" -maxdepth 1 -type f -name "*.zip.sha256" -print -quit)"
+
+            for required_asset in \
+              "$linux_deb" \
+              "$linux_sha" \
+              "$mac_archive" \
+              "$mac_sha" \
+              "$windows_archive" \
+              "$windows_sha"; do
+              if [ -z "$required_asset" ] || [ ! -s "$required_asset" ]; then
+                echo "Release asset missing or empty."
+                exit 1
+              fi
+            done
+
+            release_notes="Automated CircleCI release for ${CIRCLE_TAG}. All platform artifacts passed build, packaging, and smoke checks."
+            if gh release view "${CIRCLE_TAG}" >/dev/null 2>&1; then
+              gh release upload "${CIRCLE_TAG}" \
+                "$linux_deb" \
+                "$linux_sha" \
+                "$mac_archive" \
+                "$mac_sha" \
+                "$windows_archive" \
+                "$windows_sha" \
+                --clobber
+            else
+              gh release create "${CIRCLE_TAG}" \
+                "$linux_deb" \
+                "$linux_sha" \
+                "$mac_archive" \
+                "$mac_sha" \
+                "$windows_archive" \
+                "$windows_sha" \
+                --title "prune-guard ${CIRCLE_TAG}" \
+                --notes "$release_notes"
+            fi
+
 workflows:
   version: 2
   pr-main-tests:
@@ -407,17 +514,55 @@ workflows:
           filters:
             branches:
               ignore: main
+            tags:
+              ignore: /.*/
   cross-platform-build-distribution:
     jobs:
       - linux-build-package:
           filters:
             branches:
               ignore: main
+            tags:
+              ignore: /.*/
       - macos-build-package:
           filters:
             branches:
               ignore: main
+            tags:
+              ignore: /.*/
       - windows-build-package:
           filters:
             branches:
               ignore: main
+            tags:
+              ignore: /.*/
+  release-github-assets:
+    jobs:
+      - linux-build-package:
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /^v.*/
+      - macos-build-package:
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /^v.*/
+      - windows-build-package:
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /^v.*/
+      - github-release-publish:
+          requires:
+            - linux-build-package
+            - macos-build-package
+            - windows-build-package
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /^v.*/

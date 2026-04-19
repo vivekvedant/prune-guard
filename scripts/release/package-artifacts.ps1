@@ -73,6 +73,7 @@ $archivePath = Join-Path $OutputDir ("$packageName.zip")
 $checksumPath = "$archivePath.sha256"
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
+Add-Type -AssemblyName System.IO.Compression
 
 if (Test-Path -LiteralPath $archivePath) {
   Remove-Item -LiteralPath $archivePath -Force
@@ -94,8 +95,17 @@ $zip = New-Object -TypeName System.IO.Compression.ZipArchive -ArgumentList @(
       throw 'Package staging area contains no files.'
     }
 
+    $resolvedPackageRoot = (Resolve-Path -LiteralPath $packageRoot).Path
+    if (-not $resolvedPackageRoot.EndsWith('\')) {
+      $resolvedPackageRoot = "$resolvedPackageRoot\"
+    }
+    $packageRootUri = [Uri]$resolvedPackageRoot
+
     foreach ($file in $files) {
-      $relativePath = [System.IO.Path]::GetRelativePath($packageRoot, $file.FullName).Replace('\', '/')
+      # Use URI-based relative paths for compatibility with older
+      # Windows PowerShell/.NET runtimes.
+      $targetUri = [Uri]((Resolve-Path -LiteralPath $file.FullName).Path)
+      $relativePath = [Uri]::UnescapeDataString($packageRootUri.MakeRelativeUri($targetUri).ToString()).Replace('\', '/')
       $entry = $zip.CreateEntry($relativePath, [System.IO.Compression.CompressionLevel]::Optimal)
       $entry.LastWriteTime = $epochOffset
 
