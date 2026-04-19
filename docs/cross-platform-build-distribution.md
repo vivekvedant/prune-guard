@@ -38,6 +38,7 @@ This feature makes the CircleCI build matrix, packaging rules, artifact integrit
 - Release publication is tag-driven (`v*`) and runs only after Linux, macOS, and Windows packaging jobs complete successfully.
 - CircleCI collects `.deb`, `.tar.gz`, and `.zip` artifacts plus matching `.sha256` files from all platform jobs.
 - The `github-release-publish` job creates a GitHub release when the tag is new, or uploads with overwrite semantics when the release already exists.
+- Publication commands resolve the repository from CircleCI project metadata and do not rely on local `.git` checkout state.
 - GitHub release publication is fail-closed:
   - missing artifacts block publication
   - missing checksums block publication

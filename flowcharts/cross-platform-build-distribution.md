@@ -46,5 +46,6 @@ flowchart TD
 - Linux `.deb` packaging must include only install-time payload files and must not embed the full `target/release` build tree.
 - Windows `.zip` packaging must include non-empty release binaries and checksum output.
 - GitHub release publication must run only for version tags and must fail closed when any asset is missing.
+- Release publication should use explicit CircleCI project metadata for repository selection instead of depending on local git checkout state.
 - Any ambiguity in artifact integrity or smoke-test status must be treated as a release stop, not a warning.
 - Fail-closed release gating is required so partial platform coverage cannot be mistaken for a complete distribution.
