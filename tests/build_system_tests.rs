@@ -236,6 +236,14 @@ fn packaging_scripts_generate_sha256_checksums() {
         "windows packaging script must load System.IO.Compression so ZipArchiveMode resolves in Windows PowerShell"
     );
     assert!(
+        !contains_case_insensitive(&powershell_script, "1970-01-01T00:00:00"),
+        "windows packaging script must not use 1970 ZIP timestamps because ZIP format requires 1980+ entry timestamps"
+    );
+    assert!(
+        contains_case_insensitive(&powershell_script, "1980-01-01T00:00:00"),
+        "windows packaging script must use a deterministic ZIP-safe timestamp"
+    );
+    assert!(
         contains_case_insensitive(&powershell_script, ".zip"),
         "windows packaging script must emit zip artifacts"
     );

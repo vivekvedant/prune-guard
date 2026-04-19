@@ -18,10 +18,10 @@ function Get-HostTriple {
 }
 
 function Get-DeterministicEpochUtc {
-  # Avoid relying on UnixEpoch static properties, which are inconsistent across
-  # some Windows/.NET combinations used in CI images.
+  # ZIP containers reject entry timestamps before 1980-01-01, so use the
+  # earliest ZIP-safe instant for deterministic builds.
   return [DateTime]::SpecifyKind(
-    [DateTime]::Parse('1970-01-01T00:00:00'),
+    [DateTime]::Parse('1980-01-01T00:00:00'),
     [DateTimeKind]::Utc
   )
 }
