@@ -47,7 +47,6 @@ The current config model supports:
 - `min_unused_age_days`
 - `max_delete_per_run_gb`
 - `dry_run`
-- `allow_missing_image_labels`
 - `enabled_backends`
 - `protected_images`
 - `protected_volumes`
