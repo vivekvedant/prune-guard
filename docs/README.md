@@ -18,7 +18,7 @@ This folder contains feature-oriented documentation beyond top-level requirement
 - `podman-backend.md`: Podman adapter parity behavior, graceful degradation, and test coverage
 - `reliability-and-error-handling.md`: retry/backoff, partial-failure continuation, locking, and fail-closed reliability behavior
 - `observability-security-portability.md`: structured logs, redaction, metrics hooks, least-privilege checks, and OS validation
-- `release-readiness.md`: documentation alignment, release readiness rules, dry-run default, and fail-closed release guidance
+- `release-readiness.md`: documentation alignment, release readiness rules, real-run default with dry-run opt-in guidance, and fail-closed release guidance
 - `cross-platform-build-distribution.md`: Linux/macOS build matrix, Linux `.deb` packaging with daemon service + bootstrap timer install payload, checksums, and fail-closed release gating
 - `build-and-test.md`: local build, test, and smoke test instructions for day-to-day development
 - `release-runbook.md`: Release operator runbook for merge readiness, documentation checks, and abort conditions
@@ -28,5 +28,5 @@ This folder contains feature-oriented documentation beyond top-level requirement
 
 - Keep documents scoped and versioned with code changes.
 - Safety-critical behavior changes MUST include matching docs updates.
-- Safety guidance should remain fail-closed and default to dry-run behavior unless explicitly overridden.
+- Safety guidance should remain fail-closed and explicitly document runtime defaults, including when dry-run must be enabled for validation.
 - Release-ready changes should include the runbook and checklist entries used to verify the merge path.

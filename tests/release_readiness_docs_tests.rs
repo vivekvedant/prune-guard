@@ -60,7 +60,7 @@ fn markdown_files_matching(root: &Path, folder: &str, needle: &str) -> Vec<PathB
         .collect()
 }
 
-fn assert_has_fail_closed_and_dry_run_default(path: &Path) {
+fn assert_has_fail_closed_and_runtime_default(path: &Path) {
     let content = read_text(path);
     assert!(
         contains_case_insensitive(&content, "fail-closed")
@@ -75,11 +75,12 @@ fn assert_has_fail_closed_and_dry_run_default(path: &Path) {
     );
     assert!(
         contains_case_insensitive(&content, "by default")
+            || contains_case_insensitive(&content, "runtime default")
             || contains_case_insensitive(&content, "default dry-run")
             || contains_case_insensitive(&content, "dry-run default")
             || contains_case_insensitive(&content, "default behavior")
             || contains_case_insensitive(&content, "default runtime mode"),
-        "{} must state dry-run default behavior explicitly",
+        "{} must state runtime default behavior explicitly",
         path.display()
     );
 }
@@ -130,7 +131,7 @@ fn release_readiness_docs_exist_and_include_safety_language() {
             "{} should describe release-readiness behavior",
             path.display()
         );
-        assert_has_fail_closed_and_dry_run_default(&path);
+        assert_has_fail_closed_and_runtime_default(&path);
     }
 }
 
@@ -183,6 +184,6 @@ fn runbook_and_checklist_files_exist_and_state_safe_defaults() {
     );
 
     for path in runbooks.iter().chain(checklists.iter()) {
-        assert_has_fail_closed_and_dry_run_default(path);
+        assert_has_fail_closed_and_runtime_default(path);
     }
 }

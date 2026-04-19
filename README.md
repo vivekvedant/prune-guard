@@ -5,7 +5,7 @@ It reclaims disk space by removing unused artifacts while defaulting to conserva
 
 ## Safety Model
 
-- `dry_run` is the default behavior.
+- `dry_run = false` is the default behavior; enable dry-run explicitly when you want simulation mode.
 - Fail-closed decisions are mandatory on uncertainty.
 - Never delete active resources (running, referenced, or protected artifacts).
 - Every cleanup/skip path should be auditable through structured summaries.
@@ -45,7 +45,7 @@ sudo mkdir -p /etc/prune-guard
 sudo cp config/prune-guard.toml /etc/prune-guard/prune-guard.toml
 ```
 
-3. Run daemon once locally (safe dry-run default):
+3. Run daemon once locally (set `dry_run = true` first if you want simulation):
 
 ```bash
 cargo run -- --config /etc/prune-guard/prune-guard.toml --once
